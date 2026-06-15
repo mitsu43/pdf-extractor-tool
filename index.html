@@ -1,0 +1,4530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF抽出ツール · 日経 & 汎用書籍対応</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;800&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --paper: #f7f3ea;
+  --paper-2: #ede7d8;
+  --ink: #14110d;
+  --ink-soft: #2a251e;
+  --red: #b8242a;
+  --red-dark: #8a1a1f;
+  --gold: #8b6f2b;
+  --gray: #6b6359;
+  --gray-soft: #9a9285;
+  --line: #c9c2b1;
+  --line-soft: #ddd6c5;
+  --ok: #2d6a3f;
+  --warn: #c2691a;
+  --err: #b8242a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--paper); color: var(--ink); }
+body {
+  font-family: 'Noto Serif JP', 'Times New Roman', serif;
+  padding: 40px 24px 80px;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(184, 36, 42, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(139, 111, 43, 0.04) 0%, transparent 40%);
+}
+.container { max-width: 1080px; margin: 0 auto; }
+
+/* ============ Header ============ */
+header {
+  border-top: 8px double var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding: 28px 0 20px;
+  margin-bottom: 40px;
+  position: relative;
+}
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+h1 {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+h1 .accent { color: var(--red); }
+.subtitle {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 11px;
+  color: var(--gray);
+  letter-spacing: 0.22em;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.meta-bar {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 11px;
+  color: var(--gray);
+  margin-top: 14px;
+  letter-spacing: 0.05em;
+}
+.meta-bar .dot { color: var(--red); margin: 0 8px; }
+
+/* ============ Sections ============ */
+section { margin-bottom: 28px; }
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--ink);
+}
+.step-num {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--paper);
+  background: var(--ink);
+  padding: 3px 8px;
+  display: inline-block;
+}
+.section-head h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.section-head .hint {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+  color: var(--gray);
+  margin-left: auto;
+}
+
+/* ============ Forms ============ */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 700px) {
+  .form-grid, .form-grid.three { grid-template-columns: 1fr; }
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.field input, .field select, .field textarea {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 14px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  border-radius: 0;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--ink);
+}
+.field .desc {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 11px;
+  color: var(--gray);
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+.checkbox input { width: 16px; height: 16px; cursor: pointer; }
+
+/* ============ Drop Zone ============ */
+.dropzone {
+  border: 2px dashed var(--line);
+  background: rgba(255, 255, 255, 0.5);
+  padding: 36px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dropzone:hover, .dropzone.drag {
+  border-color: var(--red);
+  background: rgba(184, 36, 42, 0.03);
+}
+.dropzone.loaded {
+  border-style: solid;
+  border-color: var(--ink);
+  background: white;
+  text-align: left;
+}
+.dz-icon {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 32px;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.dz-text { font-family: 'Noto Sans JP', sans-serif; font-size: 14px; color: var(--ink); }
+.dz-sub { font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: var(--gray); margin-top: 4px; }
+.pdf-info { display: flex; align-items: center; gap: 16px; }
+.pdf-icon {
+  width: 48px; height: 60px;
+  background: var(--ink); color: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.pdf-details { flex: 1; min-width: 0; }
+.pdf-name {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 14px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pdf-stats { font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: var(--gray); margin-top: 4px; }
+
+/* ============ Button ============ */
+.action-row { margin-top: 32px; display: flex; gap: 12px; align-items: center; }
+.btn {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 14px; font-weight: 600; letter-spacing: 0.1em;
+  padding: 14px 28px;
+  border: none; cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-primary:hover:not(:disabled) { background: var(--red); }
+.btn-primary:disabled { background: var(--gray-soft); cursor: not-allowed; opacity: 0.6; }
+.btn-secondary { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+.btn-secondary:hover { background: var(--ink); color: var(--paper); }
+.btn-sm { font-size: 11px; padding: 8px 16px; }
+.btn-xs { font-size: 10px; padding: 5px 10px; letter-spacing: 0.08em; }
+
+/* ============ Schema designer ============ */
+.preset-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.preset-btn {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px; font-weight: 600;
+  padding: 8px 14px;
+  background: white;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.04em;
+}
+.preset-btn:hover { border-color: var(--ink); }
+.preset-btn.active {
+  background: var(--ink); color: var(--paper); border-color: var(--ink);
+}
+.preset-desc {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px; color: var(--gray);
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: rgba(139, 111, 43, 0.06);
+  border-left: 3px solid var(--gold);
+  line-height: 1.6;
+}
+.schema-table {
+  background: white;
+  border: 1px solid var(--line);
+}
+.schema-table-head, .schema-row {
+  display: grid;
+  grid-template-columns: 32px 1.1fr 1.1fr 0.7fr 1.8fr 0.5fr 60px;
+  gap: 0;
+  align-items: stretch;
+}
+.schema-table-head {
+  background: var(--paper-2);
+  border-bottom: 2px solid var(--ink);
+}
+.schema-table-head > div {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 8px 10px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  border-right: 1px solid var(--line);
+}
+.schema-table-head > div:last-child { border-right: none; }
+.schema-row {
+  border-bottom: 1px solid var(--line-soft);
+}
+.schema-row:last-child { border-bottom: none; }
+.schema-row > * {
+  padding: 8px 10px;
+  border-right: 1px solid var(--line-soft);
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+}
+.schema-row > *:last-child { border-right: none; justify-content: center; }
+.schema-row input, .schema-row select {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+  outline: none;
+  padding: 4px 0;
+  color: var(--ink);
+}
+.schema-row input:focus, .schema-row select:focus {
+  background: #fdfaf1;
+}
+.schema-row .drag-h {
+  cursor: grab; color: var(--gray-soft); font-size: 14px;
+  justify-content: center;
+}
+.schema-row .drag-h:active { cursor: grabbing; }
+.schema-row.dragging { opacity: 0.4; }
+.schema-row.drag-over { border-top: 2px solid var(--red); }
+.del-field {
+  background: none; border: none; cursor: pointer;
+  color: var(--gray); font-size: 14px;
+  padding: 2px 6px;
+}
+.del-field:hover { color: var(--err); }
+.schema-actions {
+  margin-top: 12px;
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+.schema-extras {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 14px;
+  background: rgba(20, 17, 13, 0.02);
+  border: 1px solid var(--line-soft);
+}
+@media (max-width: 700px) { .schema-extras { grid-template-columns: 1fr; } }
+
+/* ============ Cost panel ============ */
+.cost-panel {
+  background: linear-gradient(135deg, #fdfaf1 0%, white 100%);
+  border: 1px solid var(--ink);
+  margin-top: 20px;
+  overflow: hidden;
+}
+.cost-head {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cost-head h3 {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.cost-head .pill {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 10px;
+  padding: 3px 8px;
+  background: var(--red);
+  color: white;
+  letter-spacing: 0.08em;
+}
+.cost-head .pill.free { background: var(--ok); }
+.cost-head .pill.cheap { background: var(--gold); }
+.cost-body { padding: 18px 20px; }
+.cost-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.cost-jpy {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.cost-jpy .yen { font-size: 18px; color: var(--gray); margin-right: 4px; }
+.cost-usd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--gray);
+}
+.cost-note {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  padding: 10px 12px;
+  background: rgba(184, 36, 42, 0.04);
+  border-left: 3px solid var(--red);
+  margin-bottom: 12px;
+}
+.cost-note.ok {
+  background: rgba(45, 106, 63, 0.06);
+  border-left-color: var(--ok);
+}
+.cost-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.cost-cell {
+  background: white;
+  border: 1px solid var(--line-soft);
+  padding: 10px 12px;
+}
+.cost-cell .l {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 10px;
+  color: var(--gray);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.cost-cell .v {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cost-cell .s {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 10px;
+  color: var(--gray);
+  margin-top: 2px;
+}
+.cost-breakdown {
+  margin-top: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  padding: 10px 14px;
+  line-height: 1.7;
+}
+.cost-breakdown summary {
+  cursor: pointer;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--ink);
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+.cost-breakdown summary:hover { color: var(--red); }
+.cost-breakdown table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+.cost-breakdown td { padding: 3px 8px 3px 0; }
+.cost-breakdown td:last-child { text-align: right; font-weight: 600; }
+
+/* ============ Progress ============ */
+.progress-panel { background: white; border: 1px solid var(--line); padding: 0; margin-bottom: 28px; }
+.progress-head { background: var(--ink); color: var(--paper); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; }
+.progress-head h3 { font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; }
+.progress-status { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--paper-2); }
+.progress-log { padding: 16px 20px; font-family: 'JetBrains Mono', 'Noto Sans JP', monospace; font-size: 12px; line-height: 1.7; max-height: 280px; overflow-y: auto; background: #fdfaf1; }
+.log-entry { display: flex; gap: 12px; padding: 2px 0; }
+.log-time { color: var(--gray-soft); flex-shrink: 0; width: 60px; }
+.log-msg { flex: 1; word-break: break-word; }
+.log-info .log-msg { color: var(--ink-soft); }
+.log-ok .log-msg { color: var(--ok); }
+.log-warn .log-msg { color: var(--warn); }
+.log-err .log-msg { color: var(--err); }
+.log-bold .log-msg { font-weight: 700; color: var(--ink); }
+
+/* ============ Validation ============ */
+.validation-panel { background: white; border: 1px solid var(--line); padding: 20px; margin-bottom: 28px; }
+.validation-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line-soft); }
+.validation-head h3 { font-family: 'Noto Sans JP', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.05em; }
+.v-badge { font-family: 'Noto Sans JP', sans-serif; font-size: 10px; font-weight: 700; padding: 3px 8px; letter-spacing: 0.1em; }
+.v-badge-ok { background: var(--ok); color: white; }
+.v-badge-warn { background: var(--warn); color: white; }
+.v-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.v-check { font-family: 'Noto Sans JP', sans-serif; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.v-check .mark { font-weight: 700; font-size: 14px; }
+.v-check.ok .mark { color: var(--ok); }
+.v-check.fail .mark { color: var(--err); }
+.v-issues { margin-top: 12px; padding: 12px; background: rgba(184, 36, 42, 0.05); border-left: 3px solid var(--err); font-family: 'Noto Sans JP', sans-serif; font-size: 12px; }
+.v-issues ul { margin-left: 18px; margin-top: 6px; }
+.v-issue-details { margin: 6px 0 0 18px; color: var(--ink-soft); line-height: 1.7; }
+.v-issue-details li { margin: 2px 0; }
+.v-repair-all { display: inline-block; margin: 8px 8px 4px 0; padding: 7px 12px; border: 1px solid var(--red); background: var(--red); color: white; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
+.v-repair-all:hover { filter: brightness(0.95); }
+.v-repair-auto { background: var(--ok); border-color: var(--ok); }
+.v-repair-btn { margin-left: 8px; padding: 2px 6px; border: 1px solid var(--line); background: white; color: var(--red); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; }
+.v-repair-btn:hover { background: #fdfaf1; }
+.v-copy-btn { margin-left: 6px; padding: 2px 6px; border: 1px solid var(--line); background: white; color: var(--ink-soft); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; }
+.v-copy-btn:hover { background: #fdfaf1; }
+.v-suggestion { display: block; margin: 3px 0 4px 0; color: var(--gray); font-size: 11px; line-height: 1.5; }
+
+/* ============ Results ============ */
+.results-panel { background: white; border: 1px solid var(--line); }
+.results-head { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.results-title { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
+.results-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--gray); margin-left: 8px; }
+.export-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.results-body { max-height: 600px; overflow: auto; }
+table.results { width: 100%; border-collapse: collapse; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; }
+table.results th { position: sticky; top: 0; background: var(--paper-2); font-weight: 700; padding: 10px 8px; text-align: left; border-bottom: 2px solid var(--ink); font-size: 11px; letter-spacing: 0.05em; z-index: 1; }
+table.results td { padding: 10px 8px; border-bottom: 1px solid var(--line-soft); vertical-align: top; line-height: 1.5; }
+table.results tr:hover td { background: #fdfaf1; }
+.col-no { width: 40px; text-align: right; color: var(--gray); font-family: 'JetBrains Mono', monospace; }
+.col-page { width: 50px; text-align: center; font-family: 'JetBrains Mono', monospace; }
+
+.tag {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+}
+
+.detail-toggle { cursor: pointer; color: var(--red); font-size: 11px; font-family: 'Noto Sans JP', sans-serif; margin-top: 6px; display: inline-block; }
+.detail-row { display: none; }
+.detail-row.open { display: table-row; }
+.detail-row td { background: #fdfaf1 !important; padding: 16px 20px !important; }
+.detail-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; font-size: 12px; line-height: 1.7; }
+.detail-grid dt { font-weight: 700; color: var(--ink-soft); font-size: 11px; letter-spacing: 0.05em; }
+.detail-grid dd { color: var(--ink-soft); white-space: pre-wrap; }
+
+/* ============ Misc ============ */
+.empty { text-align: center; padding: 60px 20px; font-family: 'Noto Sans JP', sans-serif; color: var(--gray); font-size: 13px; }
+.hidden { display: none !important; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: var(--gray); text-align: center; letter-spacing: 0.05em; }
+.spin { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--paper-2); border-top-color: var(--red); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 4px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.manual-box { padding: 18px; }
+.hint-line { color: var(--ink-soft); line-height: 1.7; margin: 0 0 10px; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; }
+.manual-label { display: block; font-size: 13px; color: var(--ink-soft); margin: 14px 0 6px; font-weight: 700; font-family: 'Noto Sans JP', sans-serif; }
+.manual-textarea {
+  width: 100%; min-height: 170px; resize: vertical;
+  border: 1px solid var(--line); border-radius: 0;
+  padding: 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px; line-height: 1.6;
+  background: #fff; color: var(--ink);
+}
+#schemaJsonPanel summary::-webkit-details-marker { display: none; }
+#schemaJsonPanel summary > span:first-child { display: inline-block; transition: transform 0.15s; }
+#schemaJsonPanel[open] summary > span:first-child { transform: rotate(90deg); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="masthead">
+    <h1>PDF<span class="accent">抽出</span>ツール</h1>
+    <div class="subtitle">PDF EXTRACTOR · NEWSPAPER &amp; BOOK</div>
+  </div>
+  <div class="meta-bar">
+    <span>カスタム抽出スキーマ <span class="dot">·</span> Gemini API連携 <span class="dot">·</span> リアルタイムコスト試算</span>
+    <span id="todayDate"></span>
+  </div>
+</header>
+
+<!-- ============ Post-process existing files (cleanup tool) ============ -->
+<section>
+  <div style="background: rgba(139, 111, 43, 0.06); border: 1px dashed var(--gold); padding: 12px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 200px;">
+      <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 2px;">既存ファイルの後処理</div>
+      <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: var(--gray);">既存のExcel/JSONから[cite:]タグなどを一括除去して再保存</div>
+    </div>
+    <input type="file" id="cleanupFileInput" accept=".xlsx,.json,.csv" hidden>
+    <button class="btn btn-secondary btn-sm" id="cleanupFileBtn">ファイルを選択して[cite:]除去</button>
+  </div>
+</section>
+
+<!-- ============ STEP 1: API設定 ============ -->
+<section>
+  <div class="section-head">
+    <span class="step-num">STEP 01</span>
+    <h2>API設定</h2>
+    <span class="hint">Google AI Studio で取得</span>
+  </div>
+  <div class="form-grid three">
+    <div class="field">
+      <label>実行モード</label>
+      <select id="runMode">
+        <option value="manual" selected>Gemini手動相談（API課金なし）</option>
+        <option value="api">Gemini API自動</option>
+      </select>
+      <span class="desc">手動相談は、このツールで指示文を作り、Geminiブラウザに貼ってJSONを戻します。</span>
+    </div>
+    <div class="field">
+      <label>Gemini API Key</label>
+      <input type="password" id="apiKey" placeholder="AIza...">
+      <span class="desc">API自動モードのみ使用。手動相談モードでは不要です。</span>
+    </div>
+    <div class="field">
+      <label>モデル</label>
+      <select id="model">
+        <option value="gemini-2.5-pro">gemini-2.5-pro (高精度 / 無料枠 100回/日)</option>
+        <option value="gemini-2.5-flash">gemini-2.5-flash (中精度 / 無料枠 250回/日)</option>
+        <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (推奨・最安 / 無料枠 1000回/日)</option>
+      </select>
+      <span class="desc">コスト試算と実行で使用。</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 2: PDF ============ -->
+<section>
+  <div class="section-head">
+    <span class="step-num">STEP 02</span>
+    <h2>PDFアップロード</h2>
+    <span class="hint">新聞・法律書・教科書 など</span>
+  </div>
+  <div class="dropzone" id="dropzone">
+    <div class="dz-icon">＋</div>
+    <div class="dz-text">PDFファイルをここにドロップ<br>または クリックして選択</div>
+    <div class="dz-sub">日経新聞PDFの場合、ファイル名末尾 (m/e/r/p) から版種を自動判定</div>
+    <input type="file" id="fileInput" accept=".pdf,application/pdf" hidden>
+  </div>
+</section>
+
+<!-- ============ STEP 3: 抽出スキーマ ============ -->
+<section>
+  <div class="section-head">
+    <span class="step-num">STEP 03</span>
+    <h2>抽出スキーマ</h2>
+    <span class="hint">プリセット選択 or 自由設計</span>
+  </div>
+
+  <div class="preset-row" id="presetRow">
+    <!-- Filled by JS -->
+  </div>
+  <div class="preset-desc" id="presetDesc"></div>
+
+  <div class="schema-table" id="schemaTable">
+    <div class="schema-table-head">
+      <div></div>
+      <div>キー (英)</div>
+      <div>表示名 (日)</div>
+      <div>型</div>
+      <div>説明 / プロンプト指示</div>
+      <div>必須</div>
+      <div></div>
+    </div>
+    <div id="schemaRows"></div>
+  </div>
+  <div class="schema-actions">
+    <button class="btn btn-secondary btn-sm" id="addFieldBtn">+ 項目を追加</button>
+    <button class="btn btn-secondary btn-sm" id="saveSchemaBtn">ブラウザに保存</button>
+    <button class="btn btn-secondary btn-sm" id="resetSchemaBtn">プリセットに戻す</button>
+    <button class="btn btn-secondary btn-sm" id="exportSchemaBtn">📥 JSONダウンロード</button>
+    <button class="btn btn-secondary btn-sm" id="importSchemaBtn">📤 JSONアップロード</button>
+    <button class="btn btn-secondary btn-sm" id="pasteSchemaBtn">📋 JSON貼り付け</button>
+    <input type="file" id="schemaFileInput" accept=".json,application/json" hidden>
+  </div>
+
+  <!-- Schema JSON paste/load panel (collapsible) -->
+  <details id="schemaJsonPanel" style="margin-top: 12px; background: rgba(139, 111, 43, 0.06); border: 1px solid var(--gold); border-left-width: 4px;">
+    <summary style="cursor: pointer; padding: 10px 14px; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 600; color: var(--ink); user-select: none; list-style: none;">
+      <span style="color: var(--gold); margin-right: 6px;">▸</span>
+      Geminiや他システムで作成したスキーマJSONを貼り付け
+    </summary>
+    <div style="padding: 0 14px 14px 14px;">
+      <p style="font-family: 'Noto Sans JP', sans-serif; font-size: 12px; color: var(--ink-soft); line-height: 1.7; margin-bottom: 10px;">
+        Gemini や ChatGPT に「以下の形式で抽出スキーマを作って」と指示して得たJSONをそのまま貼り付けると、スキーマ表に反映されます。<br>
+        <strong>対応形式:</strong> このツールが出力する形式（fields/enrichFields/role/rules）、または各フィールドの配列のみ。
+      </p>
+      <textarea id="schemaJsonText" placeholder='{"fields":[{"key":"no","label":"No","type":"integer","required":true,"desc":"連番"}, ...],"enrichFields":[...],"role":"あなたは...","rules":"..."}' style="width:100%; min-height: 140px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; padding: 10px; border: 1px solid var(--line); background: white; outline: none; -webkit-appearance: none; appearance: none;"></textarea>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+        <button class="btn btn-primary btn-sm" id="applySchemaJsonBtn">このJSONを反映</button>
+        <button class="btn btn-secondary btn-sm" id="fillSchemaJsonBtn">現在のスキーマを表示</button>
+        <button class="btn btn-secondary btn-sm" id="copySchemaPromptBtn">📋 スキーマ作成プロンプトをコピー</button>
+      </div>
+      <p style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: var(--gray); margin-top: 8px;">
+        ※ 「スキーマ作成プロンプト」はGemini/ChatGPTに「こういうスキーマを作って」と頼むためのテンプレートです。
+      </p>
+    </div>
+  </details>
+
+  <div class="schema-extras">
+    <div class="field">
+      <label>役割定義 (システムプロンプト)</label>
+      <textarea id="rolePrompt" rows="3" style="font-family: 'Noto Sans JP', sans-serif; font-size: 13px; line-height: 1.6;"></textarea>
+      <span class="desc">「あなたは〜の専門家」など。トーンや専門性を指定。</span>
+    </div>
+    <div class="field">
+      <label>抽出ルール / 追加指示</label>
+      <textarea id="extractionRules" rows="3" style="font-family: 'Noto Sans JP', sans-serif; font-size: 13px; line-height: 1.6;"></textarea>
+      <span class="desc">「広告は除外」「条文は条番号付きで」など。1行1ルール推奨。</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 4: Options + Cost ============ -->
+<section>
+  <div class="section-head">
+    <span class="step-num">STEP 04</span>
+    <h2>実行オプション</h2>
+    <span class="hint">バッチサイズと再試行</span>
+  </div>
+  <div class="form-grid three">
+    <div class="field">
+      <label>分割バッチサイズ (ページ)</label>
+      <input type="number" id="batchSize" value="5" min="2" max="30">
+      <span class="desc"><strong>2以上推奨</strong>。濃い内容(法律書等)は5前後、新聞は10以上が目安。切れたら自動で半分に分割します。</span>
+    </div>
+    <div class="field">
+      <label>呼出間隔（秒）</label>
+      <input type="number" id="callInterval" value="6" min="0" max="60" step="0.5">
+      <span class="desc" id="callIntervalDesc">RPM制限回避用。<strong>6秒=10 RPM以下</strong>に抑制。</span>
+    </div>
+    <div class="field">
+      <label>最大再試行回数</label>
+      <input type="number" id="maxRetry" value="4" min="0" max="8">
+      <span class="desc">429時はサーバ指示秒数で待機+再試行。</span>
+    </div>
+  </div>
+  <div class="checkbox-row">
+    <label class="checkbox">
+      <input type="checkbox" id="freeTierSafe" checked>
+      <span><strong>無料枠セーフモード</strong>（モデル別RPMに合わせて自動で呼出間隔を調整）</span>
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="strictMode">
+      <span>厳格モード（検証警告をログに表示）</span>
+    </label>
+    <label class="checkbox" id="enrichLabel">
+      <input type="checkbox" id="enrichFM" checked>
+      <span id="enrichLabelText">深掘り分析を実施（プリセットが定義されている場合）</span>
+    </label>
+  </div>
+
+  <!-- Cost Panel -->
+  <div class="cost-panel" id="costPanel">
+    <div class="cost-head">
+      <h3>API利用コスト試算</h3>
+      <span class="pill" id="costPill">—</span>
+    </div>
+    <div class="cost-body">
+      <div class="cost-headline">
+        <div class="cost-jpy"><span class="yen">¥</span><span id="costJpy">—</span></div>
+        <div class="cost-usd">≈ $<span id="costUsd">—</span> USD</div>
+      </div>
+      <div class="cost-note" id="costNote">PDFを読み込むと自動で試算します。</div>
+
+      <div class="cost-grid">
+        <div class="cost-cell">
+          <div class="l">API呼出回数</div>
+          <div class="v" id="costCalls">—</div>
+          <div class="s" id="costCallsSub">—</div>
+        </div>
+        <div class="cost-cell">
+          <div class="l">入力トークン</div>
+          <div class="v" id="costInTok">—</div>
+          <div class="s" id="costInTokSub">PDF画像 + プロンプト</div>
+        </div>
+        <div class="cost-cell">
+          <div class="l">出力トークン</div>
+          <div class="v" id="costOutTok">—</div>
+          <div class="s" id="costOutTokSub">構造化JSON</div>
+        </div>
+        <div class="cost-cell">
+          <div class="l">為替レート</div>
+          <div class="v"><input type="number" id="usdJpy" value="155" min="100" max="300" style="width:70px; border: 1px solid var(--line); padding: 2px 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px;"> 円/$</div>
+          <div class="s">必要に応じて調整</div>
+        </div>
+      </div>
+
+      <details class="cost-breakdown">
+        <summary>内訳とモデル単価を表示</summary>
+        <div id="costBreakdown"></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Action ============ -->
+<div class="action-row">
+  <button class="btn btn-primary" id="testRunBtn" disabled style="background: var(--gold); border-color: var(--gold);">🧪 1ページだけお試し抽出</button>
+  <button class="btn btn-primary" id="startBtn" disabled>抽出を開始（全ページ）</button>
+  <button class="btn btn-secondary btn-sm hidden" id="stopBtn">⏸ 停止</button>
+  <button class="btn btn-secondary btn-sm hidden" id="resumeBtn">続きから再開</button>
+  <button class="btn btn-secondary btn-sm hidden" id="resetBtn">リセット</button>
+</div>
+<p style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: var(--gray); margin-top: 8px; line-height: 1.6;">
+  ※ <strong>初回は「お試し抽出」推奨</strong>: 1ページだけ抽出してアウトプット形式を確認 → 問題なければ全ページ実行。<br>
+  　 これで無料枠を浪費せずに、スキーマ設定や指示文の問題を事前にチェックできます。
+</p>
+
+<!-- ============ Manual Gemini workflow ============ -->
+<section id="manualSection" class="hidden" style="margin-top: 40px;">
+  <div class="progress-panel">
+    <div class="progress-head">
+      <h3>Gemini手動相談 (並列実行モード)</h3>
+      <div class="progress-status" id="manualStatus">待機中</div>
+    </div>
+    <div class="manual-box">
+      <!-- Bulk preparation section -->
+      <div id="bulkPrepRow" style="background: rgba(184, 36, 42, 0.06); border: 1px solid #b8242a; border-left-width: 5px; padding: 14px 16px; margin-bottom: 16px;">
+        <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; color: #14110d; margin-bottom: 6px;">
+          📦 まずは「全バッチを一括準備」をタップ
+        </div>
+        <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: #6b6359; line-height: 1.7; margin-bottom: 10px;" id="bulkPrepDesc">
+          バッチ数分の分割PDFと指示文を一気に用意します。準備後、各バッチをGeminiの別タブで並行処理し、戻ってきたJSONを各欄に貼ると自動取込されます。
+        </div>
+        <button class="btn btn-primary btn-sm" id="bulkPrepBtn">📦 全バッチを一括準備</button>
+      </div>
+
+      <!-- Parallel batch grid -->
+      <div id="batchGrid"></div>
+
+      <div class="action-row" style="justify-content:flex-start; margin-top: 16px; flex-wrap: wrap;">
+        <button class="btn btn-primary btn-sm" id="finishManualNow">📋 結果を表示してExcel保存へ</button>
+        <button class="btn btn-secondary btn-sm" id="saveNowBtn" title="現在の抽出データを端末に保存">💾 今すぐ保存</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Batch tile styling -->
+<style>
+.batch-tile {
+  border: 2px solid var(--line);
+  border-left-width: 5px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: white;
+  transition: border-color 0.2s, background 0.2s;
+}
+.batch-tile.pending { border-color: #ccc; border-left-color: #aaa; }
+.batch-tile.editing { border-color: #d4a017; border-left-color: #d4a017; background: rgba(212, 160, 23, 0.04); }
+.batch-tile.done { border-color: #2e7d32; border-left-color: #2e7d32; background: rgba(46, 125, 50, 0.04); }
+.batch-tile.error { border-color: #c62828; border-left-color: #c62828; background: rgba(198, 40, 40, 0.04); }
+.batch-tile-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 8px;
+}
+.batch-tile-status {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #ccc; color: white; font-size: 14px; line-height: 1;
+  flex-shrink: 0;
+}
+.batch-tile.pending .batch-tile-status { background: #aaa; }
+.batch-tile.editing .batch-tile-status { background: #d4a017; }
+.batch-tile.done .batch-tile-status { background: #2e7d32; }
+.batch-tile.error .batch-tile-status { background: #c62828; }
+.batch-tile-title { flex: 1; min-width: 120px; }
+.batch-tile-meta { font-size: 11px; color: #6b6359; font-weight: 400; }
+.batch-tile-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.batch-tile textarea {
+  width: 100%; min-height: 80px;
+  font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5;
+  padding: 8px; border: 1px solid var(--line); background: white; outline: none;
+  resize: vertical; -webkit-appearance: none; appearance: none;
+}
+.batch-tile.done textarea { background: rgba(46, 125, 50, 0.02); }
+.batch-tile-summary {
+  font-size: 11px; color: #2e7d32; margin-top: 6px; font-family: 'Noto Sans JP', sans-serif;
+}
+.batch-tile.error .batch-tile-summary { color: #c62828; }
+</style>
+
+<!-- ============ Progress ============ -->
+<section id="progressSection" class="hidden" style="margin-top: 40px;">
+  <div class="progress-panel">
+    <div class="progress-head">
+      <h3>実行ログ</h3>
+      <div class="progress-status" id="progressStatus">待機中</div>
+    </div>
+    <div class="progress-log" id="progressLog"></div>
+  </div>
+</section>
+
+<!-- ============ Validation ============ -->
+<section id="validationSection" class="hidden">
+  <div class="validation-panel">
+    <div class="validation-head">
+      <h3>自動検証結果</h3>
+      <span class="v-badge" id="vBadge">—</span>
+    </div>
+    <div class="v-checks" id="vChecks"></div>
+    <div class="v-issues hidden" id="vIssues"></div>
+  </div>
+</section>
+
+<!-- ============ Results ============ -->
+<section id="resultsSection" class="hidden">
+  <div class="results-panel">
+    <div class="results-head">
+      <div>
+        <span class="results-title">抽出結果</span>
+        <span class="results-count" id="resultsCount">0件</span>
+      </div>
+      <div class="export-row">
+        <button class="btn btn-secondary btn-sm" id="cleanCitesBtn" title="既存の結果から [cite: ...] タグを除去">[cite:] 除去</button>
+        <button class="btn btn-secondary btn-sm" id="exportXlsx">Excel</button>
+        <button class="btn btn-secondary btn-sm" id="exportCsv">CSV</button>
+        <button class="btn btn-secondary btn-sm" id="exportMd">Markdown</button>
+        <button class="btn btn-secondary btn-sm" id="exportJson">JSON</button>
+      </div>
+    </div>
+    <div class="results-body">
+      <table class="results" id="resultsTable">
+        <thead id="resultsHead"></thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  PDF抽出ツール · PDF.js + Gemini API / 手動相談 · スキーマカスタマイズ + コスト試算
+</footer>
+
+</div>
+
+<script>
+// =====================================================================
+// PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
+// Free-tier limits as of May 2026: Gemini 1.x and 2.0 are SHUT DOWN.
+// Only 2.5 models accept generateContent requests.
+// =====================================================================
+const PRICING = {
+  'gemini-2.5-pro':        { in: 1.25, inLong: 2.50, out: 10.00, outLong: 15.00, longThreshold: 200000, freeRpd: 100,  freeRpm: 5  },
+  'gemini-2.5-flash':      { in: 0.30, out: 2.50,                                                     freeRpd: 250,  freeRpm: 10 },
+  'gemini-2.5-flash-lite': { in: 0.10, out: 0.40,                                                     freeRpd: 1000, freeRpm: 15 },
+};
+const MODEL_LABELS = {
+  'gemini-2.5-pro': 'Gemini 2.5 Pro',
+  'gemini-2.5-flash': 'Gemini 2.5 Flash',
+  'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite',
+};
+
+// Token assumptions per PDF page rendered at the tool's resolution (~1800px wide)
+const TOKENS_PER_PAGE_IMAGE = 1800;   // PDF page image
+const TOKENS_PROMPT_OVERHEAD = 600;   // Static prompt + schema definition
+const TOKENS_OUT_PER_ITEM_BASIC = 90; // Per item for headline/genre/page/etc.
+const TOKENS_OUT_PER_ITEM_RICH = 800; // Per item when long fields exist
+const TOKENS_PER_LONG_FIELD = 350;    // ~250 chars × 1.4
+const TOKENS_PER_SHORT_FIELD = 80;    // ~50 chars × 1.4
+const ITEMS_PER_PAGE_DEFAULT = 4;     // Rough density assumption
+
+// =====================================================================
+// SCHEMA PRESETS
+// =====================================================================
+const PRESETS = {
+  nikkei: {
+    id: 'nikkei',
+    name: '日経新聞（標準）',
+    description: '日経新聞から記事を抽出。A〜E列の基本情報 + F〜M列の深掘り分析・クイズ・地図JSON・版種。全13列。',
+    itemsPerPage: 5,
+    role: `あなたは日本経済新聞の読者層にふさわしい、知的で洞察に満ちた表現を用いる、国際情勢と金融市場に精通したシニアエコノミストです。
+単なる事実の羅列ではなく、経済のダイナミズムを感じさせる専門的な分析を行います。`,
+    rules: [
+      '【絶対禁止】Noを飛ばす行為（No1から10を指示しているのに、いきなり他のNoに飛ぶ）',
+      '【絶対禁止】D列のPDFページ番号を故意に省略・誤記載する行為',
+      '広告・WORLD MARKETSなどのデータ表・株価指標表を除いて漏らさず抽出',
+      '各ページから最低5記事以上を抽出。マーケット面・社会面・文化面・スポーツ面は1段ずつ精査',
+      '朝刊1面のコラム「春秋」は必ず抽出すること',
+      '短信・おくやみ・目次・コラム・小さな囲み記事も1つ残らず拾う',
+      '「きょうの紙面から」「ラウンドアップ」などの予告コーナーも記事として記載',
+      '副題がある場合は headline に「主見出し　副見出し」のように併記',
+      '1面上部・左部のカラム記事（他ページに本記事があるもの）は抽出しない',
+      '数学記号（∑、√、∞、∫、≠、≒、≤、≥）は使用禁止。日本語で表現',
+      '全件出すこと。一括で出せないなら分割で出すこと',
+    ].join('\n'),
+    enrichEnabled: true,
+    enrichLabel: 'F〜M列（深掘り分析・クイズ・地図JSON・版種）も生成',
+    fields: [
+      { key: 'no',       label: 'No',         type: 'integer', required: true, desc: '【A列】1からの連番。絶対に飛ばさず、欠番なく、必ず1ずつ増やすこと' },
+      { key: 'genre',    label: 'ジャンル',    type: 'string',  required: true, desc: '【B列】必ず次のいずれかに分類', enumValues: '国際情勢,国内,国内地域,コラム,ランキング・くらし,生活・社会,スポーツ,文化,その他' },
+      { key: 'category', label: 'カテゴリ',    type: 'string',  required: true, desc: '【C列】セクション名（例: 総合, 政治, 経済, 国際, 投資情報, 企業, スポーツ, 社会, 文化など）' },
+      { key: 'page',     label: 'PDFページ',  type: 'integer', required: true, desc: '【D列】PDFの物理ページ番号。空欄・null・0は絶対禁止' },
+      { key: 'headline', label: '見出し',      type: 'string',  required: true, desc: '【E列】記事のメインタイトル（副題があれば「主見出し　副見出し」のように併記）' },
+    ],
+    enrichFields: [
+      { key: 'content_detail', label: '内容・詳細',    type: 'string', long: true,  desc: '【F列】300字程度。背景・具体的な数値・今後の見通し・裏の意図を盛り込み、単なる要約でなく「読み物」として成立させる' },
+      { key: 'intent_motive',  label: '思惑と狙い/本音', type: 'string', long: true, desc: '【G列】政府・国家・企業・投資家などの関係者が持つ「真の意図」「報じられていない本音」を専門的に深掘り分析' },
+      { key: 'key_insights',   label: '理解すべき内容',type: 'string', long: true,  desc: '【H列】ビジネスパーソンや投資家が、その記事をなぜ重要視すべきか、社会に与えるインパクト' },
+      { key: 'quiz_q',         label: 'クイズ（問）',  type: 'string', long: false, desc: '【I列】記事の重要ポイントから理解度を測る問い' },
+      { key: 'quiz_a',         label: 'クイズ（解）',  type: 'string', long: false, desc: '【J列】クイズの正解' },
+      { key: 'keyword',        label: 'キーワード解説',type: 'string', long: false, desc: '【K列】正解や記事内容に関連する専門用語を1つ選び解説' },
+      { key: 'map_json',       label: '地図の住所',    type: 'string', long: false, desc: '【L列】関連場所の名称と正確な緯度・経度を単一行JSONで記載: { "location": "名称", "latitude": 0.0, "longitude": 0.0 }。Google Mapsで検索可能な形式: 国際=「中国 北京市」、国内=「東京都千代田区」。会談は開催都市、企業ニュースは本社所在地、市場ニュースは取引所所在地。空欄禁止。抽象的な記事は「日本」を使用。改行・インデント禁止' },
+      { key: 'edition',        label: '版種',          type: 'string', long: false, desc: '【M列】ファイル名末尾に基づき判別: m=朝刊 / e=夕刊 / r=地方版 / p=プラス1', enumValues: 'm,e,r,p' },
+    ],
+  },
+
+  law: {
+    id: 'law',
+    name: '法律書（条文）',
+    description: '六法・法律書から条文単位で抽出。条番号・項・号・見出し・条文本文を構造化。',
+    itemsPerPage: 6,
+    role: 'あなたは法律実務に精通した弁護士で、条文の構造化に長けています。',
+    rules: [
+      '条文ごとに1レコード抽出（第◯条 + 見出し + 本文）',
+      '項・号が複数ある場合は本文に「1 …\\n2 …」形式で併記',
+      '改正前後の表示や注釈は本文に含める',
+      '目次・索引・はしがき等の非条文ページは抽出対象外',
+      '括弧書きの見出しがあれば必ず記載',
+    ].join('\n'),
+    enrichEnabled: false,
+    fields: [
+      { key: 'no',          label: 'No',         type: 'integer', required: true,  desc: '連番' },
+      { key: 'law_name',    label: '法令名',     type: 'string',  required: false, desc: '法令名（民法・刑法など）' },
+      { key: 'article_no',  label: '条番号',     type: 'string',  required: true,  desc: '第◯条 形式。枝番号がある場合は「第◯条の◯」' },
+      { key: 'title',       label: '条文見出し', type: 'string',  required: false, desc: '括弧書きの見出し。なければ空文字' },
+      { key: 'body',        label: '条文本文',   type: 'string',  required: true,  desc: '条文全文。項・号は番号付きで改行区切り' },
+      { key: 'page',        label: 'PDFページ',  type: 'integer', required: true,  desc: 'PDFの物理ページ番号' },
+    ],
+  },
+
+  textbook: {
+    id: 'textbook',
+    name: '教科書・専門書',
+    description: '章・節・項の階層と要点を抽出。学習用の要約・キーワードも自動生成。',
+    itemsPerPage: 3,
+    role: 'あなたは学術書・専門書を要約することに長けた編集者です。',
+    rules: [
+      '見出し（章・節・項）ごとに1レコード',
+      'levelには「章」「節」「項」「小見出し」のいずれかを記載',
+      '本文要約は200字程度。読めば概要が分かる粒度に',
+      '図表番号や脚注は要約に含めない',
+    ].join('\n'),
+    enrichEnabled: false,
+    fields: [
+      { key: 'no',       label: 'No',       type: 'integer', required: true,  desc: '連番' },
+      { key: 'level',    label: '階層',     type: 'string',  required: true,  desc: '章/節/項/小見出し', enumValues: '章,節,項,小見出し' },
+      { key: 'number',   label: '番号',     type: 'string',  required: false, desc: '「第1章」「1.2」「(3)」など' },
+      { key: 'title',    label: 'タイトル', type: 'string',  required: true,  desc: '見出し' },
+      { key: 'summary',  label: '要約',     type: 'string',  required: true,  desc: '200字程度の要約' },
+      { key: 'keywords', label: 'キーワード', type: 'string', required: false, desc: '重要用語をカンマ区切りで3〜5個' },
+      { key: 'page',     label: 'PDFページ', type: 'integer', required: true, desc: 'PDFの物理ページ番号' },
+    ],
+  },
+
+  book_general: {
+    id: 'book_general',
+    name: '一般書籍（章・節）',
+    description: '一般書籍の目次構造と各章の要点を抽出。',
+    itemsPerPage: 2,
+    role: 'あなたは書籍の構造分析に長けた編集者です。',
+    rules: [
+      '章・節など見出しごとに抽出',
+      '主要な論旨や結論を要約に反映',
+      '長い章は要約を300字以内に収める',
+    ].join('\n'),
+    enrichEnabled: false,
+    fields: [
+      { key: 'no',       label: 'No',       type: 'integer', required: true,  desc: '連番' },
+      { key: 'chapter',  label: '章/節',    type: 'string',  required: true,  desc: '章番号や節番号' },
+      { key: 'title',    label: 'タイトル', type: 'string',  required: true,  desc: '見出し' },
+      { key: 'summary',  label: '要点',     type: 'string',  required: true,  desc: '300字以内の要点' },
+      { key: 'page',     label: 'PDFページ', type: 'integer', required: true, desc: 'PDFの物理ページ番号' },
+    ],
+  },
+
+  custom: {
+    id: 'custom',
+    name: 'カスタム',
+    description: '項目を自由に設定。ユーザー定義のスキーマで抽出します。',
+    itemsPerPage: 3,
+    role: 'あなたは文書の要点を抽出することに長けたアシスタントです。',
+    rules: '抽出ルールを記述してください。',
+    enrichEnabled: false,
+    fields: [
+      { key: 'no',       label: 'No',       type: 'integer', required: true, desc: '連番' },
+      { key: 'title',    label: 'タイトル', type: 'string',  required: true, desc: '見出し' },
+      { key: 'content',  label: '内容',     type: 'string',  required: true, desc: '内容' },
+      { key: 'page',     label: 'PDFページ', type: 'integer', required: true, desc: 'PDFの物理ページ番号' },
+    ],
+  },
+};
+
+// =====================================================================
+// STATE
+// =====================================================================
+const state = {
+  pdfFile: null,
+  pdfDoc: null,
+  pdfPageCount: 0,
+  pageImageCache: new Map(),
+  articles: [],
+  running: false,
+  manual: null,
+  schema: null,       // Active schema (fields[])
+  preset: null,       // Active preset ID
+  lastApiCallAt: 0,   // Throttle: timestamp of last API call (ms)
+  resume: null,       // { phase: 'extract'|'enrich', nextIndex: N } — when extraction failed midway
+  stopRequested: false, // Stop button pressed
+  currentBatchPages: null, // Current batch's page range {startPage, endPage} for split-PDF download
+};
+
+const $ = (id) => document.getElementById(id);
+
+// ===================================================================
+// PERSISTENT STORAGE (IndexedDB)
+// Design principles:
+//   1. NEVER delete data on error. Failure = retry, not erase.
+//   2. Save ONLY irreplaceable data (the articles array + minimal meta).
+//      Transient UI text (manualResponse) is NOT saved.
+//   3. IndexedDB has effectively unlimited quota (vs localStorage 5MB).
+//   4. Save is explicit after each meaningful event (batch import, manual import).
+// ===================================================================
+const DB_NAME = 'pdfExtractorDB';
+const DB_VERSION = 1;
+const DB_STORE = 'sessions';
+const SESSION_ID = 'current';
+let dbPromise = null;
+
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(req.result);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE, { keyPath: 'id' });
+      }
+    };
+  });
+  return dbPromise;
+}
+
+async function saveSession() {
+  // Don't save during heavy ops — caller decides when to persist.
+  // We save ONLY articles + minimal meta (no manualResponse, no PDF binary).
+  try {
+    const db = await openDB();
+    const payload = {
+      id: SESSION_ID,
+      savedAt: Date.now(),
+      articles: state.articles,
+      manualPhase: state.manual?.phase || null,
+      manualIndex: state.manual?.index || 0,
+      manualBatchSize: state.manual?.batchSize || null,
+      pdfName: state.pdfFile?.name || null,
+      pdfPageCount: state.pdfPageCount || 0,
+      preset: state.preset,
+      schemaFields: state.schema?.fields || null,
+    };
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      const req = tx.objectStore(DB_STORE).put(payload);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    // CRITICAL: On error, DO NOT delete existing data. Just log.
+    // The user's prior saves are still safe.
+    console.error('Save failed (existing data preserved):', e);
+    if (typeof log === 'function') {
+      log(`⚠ 保存失敗: ${e.message || e} (既存データは保持されています)`, 'warn');
+    }
+  }
+}
+
+async function loadSession() {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const req = tx.objectStore(DB_STORE).get(SESSION_ID);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.error('Load failed:', e);
+    return null;
+  }
+}
+
+async function clearSession() {
+  // ONLY called when user explicitly hits "破棄して新規開始"
+  try {
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      const req = tx.objectStore(DB_STORE).delete(SESSION_ID);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.error('Clear failed:', e);
+  }
+}
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+};
+$('todayDate').textContent = todayStr();
+
+// =====================================================================
+// SCHEMA: load / save / render
+// =====================================================================
+// Bumped when preset structure changes in breaking ways (column renames, removed fields, etc.)
+// Old saves with mismatched version are discarded, forcing reload of fresh preset defaults.
+const SCHEMA_VERSION = 4;
+
+function loadSavedSchema() {
+  try {
+    const raw = localStorage.getItem('pdfExtractorSchema');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if ((parsed.version || 1) < SCHEMA_VERSION) {
+      console.log('Saved schema version outdated, resetting to fresh preset');
+      return null;
+    }
+    return parsed;
+  } catch { return null; }
+}
+function saveSchema() {
+  try {
+    localStorage.setItem('pdfExtractorSchema', JSON.stringify({
+      version: SCHEMA_VERSION,
+      preset: state.preset,
+      schema: state.schema,
+      role: $('rolePrompt').value,
+      rules: $('extractionRules').value,
+    }));
+    log('スキーマを保存しました', 'ok');
+  } catch (e) {
+    alert('スキーマ保存に失敗: ' + e.message);
+  }
+}
+
+function applyPreset(presetId) {
+  const p = PRESETS[presetId];
+  if (!p) return;
+  state.preset = presetId;
+  // Deep clone fields
+  state.schema = {
+    fields: p.fields.map(f => ({...f})),
+    enrichFields: p.enrichFields ? p.enrichFields.map(f => ({...f})) : null,
+    enrichEnabled: !!p.enrichEnabled,
+    enrichLabel: p.enrichLabel || '',
+    itemsPerPage: p.itemsPerPage || ITEMS_PER_PAGE_DEFAULT,
+  };
+  $('rolePrompt').value = p.role;
+  $('extractionRules').value = p.rules;
+  $('presetDesc').textContent = p.description;
+
+  // Enrich checkbox visibility
+  if (state.schema.enrichFields && state.schema.enrichFields.length > 0) {
+    $('enrichLabel').classList.remove('hidden');
+    $('enrichLabelText').textContent = p.enrichLabel || '深掘り分析フィールドも生成';
+    $('enrichFM').checked = !!state.schema.enrichEnabled;
+  } else {
+    $('enrichLabel').classList.add('hidden');
+    $('enrichFM').checked = false;
+  }
+
+  renderPresetButtons();
+  renderSchemaTable();
+  updateCostEstimate();
+}
+
+function renderPresetButtons() {
+  const row = $('presetRow');
+  row.innerHTML = '';
+  Object.values(PRESETS).forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'preset-btn' + (state.preset === p.id ? ' active' : '');
+    b.textContent = p.name;
+    b.onclick = () => applyPreset(p.id);
+    row.appendChild(b);
+  });
+}
+
+function renderSchemaTable() {
+  const rows = $('schemaRows');
+  rows.innerHTML = '';
+  state.schema.fields.forEach((f, idx) => {
+    const row = document.createElement('div');
+    row.className = 'schema-row';
+    row.draggable = true;
+    row.dataset.idx = idx;
+    row.innerHTML = `
+      <div class="drag-h" title="ドラッグで並べ替え">⋮⋮</div>
+      <div><input type="text" data-field="key" value="${escapeHtml(f.key)}" placeholder="key"></div>
+      <div><input type="text" data-field="label" value="${escapeHtml(f.label)}" placeholder="表示名"></div>
+      <div>
+        <select data-field="type">
+          <option value="string" ${f.type==='string'?'selected':''}>string</option>
+          <option value="integer" ${f.type==='integer'?'selected':''}>integer</option>
+          <option value="number" ${f.type==='number'?'selected':''}>number</option>
+        </select>
+      </div>
+      <div><input type="text" data-field="desc" value="${escapeHtml(f.desc||'')}" placeholder="プロンプト指示"></div>
+      <div style="justify-content:center;"><input type="checkbox" data-field="required" ${f.required?'checked':''} style="width:14px;height:14px;"></div>
+      <div><button class="del-field" data-idx="${idx}" title="削除">×</button></div>
+    `;
+    rows.appendChild(row);
+  });
+
+  // Bind input changes
+  rows.querySelectorAll('input, select').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      const row = e.target.closest('.schema-row');
+      const idx = parseInt(row.dataset.idx);
+      const field = e.target.dataset.field;
+      const f = state.schema.fields[idx];
+      if (field === 'required') f[field] = e.target.checked;
+      else f[field] = e.target.value;
+      updateCostEstimate();
+    });
+  });
+  rows.querySelectorAll('.del-field').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.dataset.idx);
+      if (state.schema.fields.length <= 1) {
+        alert('項目は最低1つ必要です');
+        return;
+      }
+      state.schema.fields.splice(idx, 1);
+      renderSchemaTable();
+      updateCostEstimate();
+    });
+  });
+
+  // Drag and drop reordering
+  let dragIdx = null;
+  rows.querySelectorAll('.schema-row').forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      dragIdx = parseInt(row.dataset.idx);
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      rows.querySelectorAll('.schema-row').forEach(r => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      rows.querySelectorAll('.schema-row').forEach(r => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetIdx = parseInt(row.dataset.idx);
+      if (dragIdx === null || dragIdx === targetIdx) return;
+      const item = state.schema.fields.splice(dragIdx, 1)[0];
+      state.schema.fields.splice(targetIdx, 0, item);
+      renderSchemaTable();
+      updateCostEstimate();
+    });
+  });
+}
+
+$('addFieldBtn').addEventListener('click', () => {
+  state.schema.fields.push({
+    key: 'new_field' + (state.schema.fields.length + 1),
+    label: '新規項目',
+    type: 'string',
+    required: false,
+    desc: '',
+  });
+  renderSchemaTable();
+  updateCostEstimate();
+});
+$('saveSchemaBtn').addEventListener('click', saveSchema);
+$('resetSchemaBtn').addEventListener('click', () => {
+  if (confirm('このプリセットの初期状態に戻します。よろしいですか？')) {
+    applyPreset(state.preset);
+  }
+});
+
+// =====================================================================
+// SCHEMA JSON Import/Export
+// =====================================================================
+function buildSchemaJsonPayload() {
+  return {
+    preset: state.preset,
+    fields: state.schema.fields.map(f => ({...f})),
+    enrichFields: state.schema.enrichFields ? state.schema.enrichFields.map(f => ({...f})) : null,
+    enrichEnabled: !!state.schema.enrichEnabled,
+    enrichLabel: state.schema.enrichLabel || '',
+    itemsPerPage: state.schema.itemsPerPage || 5,
+    role: $('rolePrompt').value,
+    rules: $('extractionRules').value,
+    schemaFormatVersion: 1,
+  };
+}
+
+function applySchemaFromJson(parsed) {
+  // Accept multiple input shapes:
+  //   1. Full payload: { fields, enrichFields, role, rules, ... }
+  //   2. Array of fields only: [{ key, label, ... }, ...]
+  //   3. { fields: [...] } only
+  let fields, enrichFields, role, rules, enrichEnabled, enrichLabel, itemsPerPage;
+
+  if (Array.isArray(parsed)) {
+    // Shape 2: bare array of fields
+    fields = parsed;
+    enrichFields = null;
+  } else if (parsed && typeof parsed === 'object') {
+    fields = parsed.fields || parsed.schema?.fields || null;
+    enrichFields = parsed.enrichFields || parsed.schema?.enrichFields || null;
+    role = parsed.role || parsed.rolePrompt || null;
+    rules = parsed.rules || parsed.extractionRules || null;
+    enrichEnabled = parsed.enrichEnabled;
+    enrichLabel = parsed.enrichLabel;
+    itemsPerPage = parsed.itemsPerPage;
+  } else {
+    throw new Error('JSONの構造が認識できません');
+  }
+
+  if (!Array.isArray(fields) || fields.length === 0) {
+    throw new Error('"fields" 配列が見つかりません、または空です');
+  }
+
+  // Validate and normalize each field
+  const normField = (f, isEnrich = false) => {
+    if (!f || typeof f !== 'object') throw new Error('フィールドはオブジェクトでなければなりません');
+    if (!f.key || typeof f.key !== 'string') throw new Error('各フィールドには "key" (英字) が必要');
+    if (!f.label || typeof f.label !== 'string') f.label = f.key;
+    if (!['string', 'integer', 'number'].includes(f.type)) f.type = 'string';
+    if (typeof f.desc !== 'string') f.desc = '';
+    if (typeof f.required !== 'boolean') f.required = !isEnrich; // extract fields default required
+    return {
+      key: f.key,
+      label: f.label,
+      type: f.type,
+      desc: f.desc,
+      required: f.required,
+      ...(f.long !== undefined ? { long: !!f.long } : {}),
+      ...(f.enumValues ? { enumValues: f.enumValues } : {}),
+    };
+  };
+
+  const cleanFields = fields.map(f => normField(f, false));
+  let cleanEnrich = enrichFields ? enrichFields.map(f => normField(f, true)) : null;
+
+  // VALIDATION: detect overlap between fields and enrichFields by label OR key
+  // If fields contains items that look like enrich content (F〜M列の項目),
+  // they should be moved to enrichFields. Common offenders:
+  //   - keys like new_field6, new_field7, ... (Gemini's lazy placeholder names)
+  //   - labels matching enrichFields entries
+  const issues = [];
+  if (cleanEnrich && cleanEnrich.length > 0) {
+    const enrichLabels = new Set(cleanEnrich.map(f => f.label));
+    const enrichKeys = new Set(cleanEnrich.map(f => f.key));
+    // Find fields that look like they belong in enrichFields
+    const overlap = cleanFields.filter(f =>
+      enrichLabels.has(f.label) || enrichKeys.has(f.key)
+    );
+    if (overlap.length > 0) {
+      issues.push(`fields と enrichFields に重複あり (${overlap.length}項目): ${overlap.map(f => f.label).join(', ')}`);
+    }
+  }
+
+  // Detect lazy placeholder keys (new_field6, new_field7, etc.)
+  // These typically indicate fields that should have been in enrichFields
+  const placeholderFields = cleanFields.filter(f => /^new_field\d+$/i.test(f.key));
+  if (placeholderFields.length > 0 && cleanEnrich) {
+    // Auto-fix: remove fields with "new_field*" keys since enrichFields already covers them
+    issues.push(`仮名キー (new_field*) を ${placeholderFields.length}個検出。enrichFieldsで代替するため、fields側から自動削除しました: ${placeholderFields.map(f => f.label).join(', ')}`);
+    const filteredFields = cleanFields.filter(f => !/^new_field\d+$/i.test(f.key));
+    // Replace cleanFields with filtered version
+    cleanFields.length = 0;
+    cleanFields.push(...filteredFields);
+  }
+
+  state.schema = {
+    fields: cleanFields,
+    enrichFields: cleanEnrich,
+    enrichEnabled: enrichEnabled !== undefined ? !!enrichEnabled : !!(cleanEnrich && cleanEnrich.length > 0),
+    enrichLabel: enrichLabel || (cleanEnrich ? `F〜${String.fromCharCode(69 + cleanFields.length + cleanEnrich.length - 1)}列も生成` : ''),
+    itemsPerPage: itemsPerPage || 5,
+  };
+
+  // If a known preset is referenced, keep the preset id (so reset works correctly)
+  // Otherwise mark as custom
+  state.preset = state.preset || 'custom';
+
+  if (role !== null && role !== undefined) $('rolePrompt').value = role;
+  if (rules !== null && rules !== undefined) $('extractionRules').value = rules;
+
+  // Update UI
+  if (cleanEnrich && cleanEnrich.length > 0) {
+    $('enrichLabel').classList.remove('hidden');
+    $('enrichLabelText').textContent = state.schema.enrichLabel || 'F〜M列も生成';
+    $('enrichFM').checked = state.schema.enrichEnabled;
+  } else {
+    $('enrichLabel').classList.add('hidden');
+  }
+
+  renderSchemaTable();
+  updateCostEstimate();
+
+  return {
+    fieldCount: cleanFields.length,
+    enrichCount: cleanEnrich ? cleanEnrich.length : 0,
+    issues
+  };
+}
+
+// JSON Download
+$('exportSchemaBtn').addEventListener('click', () => {
+  const payload = buildSchemaJsonPayload();
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const presetName = state.preset || 'schema';
+  const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  a.download = `pdf-extractor-schema-${presetName}-${ymd}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  log(`📥 スキーマをダウンロード: ${a.download}`, 'ok');
+});
+
+// JSON File Upload
+$('importSchemaBtn').addEventListener('click', () => $('schemaFileInput').click());
+$('schemaFileInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const text = await f.text();
+    const parsed = JSON.parse(text);
+    const result = applySchemaFromJson(parsed);
+    log(`📤 スキーマを読み込み: A〜E列${result.fieldCount}項目, F〜M列${result.enrichCount}項目`, 'ok');
+    if (result.issues && result.issues.length > 0) {
+      result.issues.forEach(msg => log(`⚠ ${msg}`, 'warn'));
+      alert(`✓ スキーマを反映しました（自動修正あり）。\nA〜E列: ${result.fieldCount}項目\nF〜M列: ${result.enrichCount}項目\n\n⚠ 検出した問題:\n${result.issues.map(s => '・' + s).join('\n')}`);
+    } else {
+      alert(`✓ スキーマを反映しました。\nA〜E列: ${result.fieldCount}項目\nF〜M列: ${result.enrichCount}項目`);
+    }
+  } catch (err) {
+    alert('読み込み失敗: ' + err.message);
+    log(`スキーマ読み込みエラー: ${err.message}`, 'err');
+  } finally {
+    e.target.value = ''; // allow re-selection of same file
+  }
+});
+
+// JSON Paste panel
+$('pasteSchemaBtn').addEventListener('click', () => {
+  $('schemaJsonPanel').open = true;
+  $('schemaJsonText').focus();
+  $('schemaJsonPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+$('applySchemaJsonBtn').addEventListener('click', () => {
+  const text = $('schemaJsonText').value.trim();
+  if (!text) { alert('JSONを貼り付けてください'); return; }
+  try {
+    // Allow code-block-wrapped JSON
+    let cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```$/,'').trim();
+    const parsed = JSON.parse(cleaned);
+    const result = applySchemaFromJson(parsed);
+    log(`📋 JSON貼り付けからスキーマ反映: A〜E列${result.fieldCount}項目, F〜M列${result.enrichCount}項目`, 'ok');
+    if (result.issues && result.issues.length > 0) {
+      result.issues.forEach(msg => log(`⚠ ${msg}`, 'warn'));
+      alert(`✓ スキーマを反映しました（自動修正あり）。\nA〜E列: ${result.fieldCount}項目\nF〜M列: ${result.enrichCount}項目\n\n⚠ 検出した問題:\n${result.issues.map(s => '・' + s).join('\n')}`);
+    } else {
+      alert(`✓ スキーマを反映しました。\nA〜E列: ${result.fieldCount}項目\nF〜M列: ${result.enrichCount}項目`);
+    }
+  } catch (err) {
+    alert('JSONの解析に失敗:\n' + err.message);
+    log(`JSON貼り付けエラー: ${err.message}`, 'err');
+  }
+});
+
+$('fillSchemaJsonBtn').addEventListener('click', () => {
+  $('schemaJsonText').value = JSON.stringify(buildSchemaJsonPayload(), null, 2);
+});
+
+$('copySchemaPromptBtn').addEventListener('click', async () => {
+  const promptText = `あなたはAI抽出ツールのスキーマ設計者です。以下の要件に基づいて、PDF抽出用のスキーマをJSON形式で出力してください。
+
+【出力対象】
+（ここに用途を記入: 例「日経新聞の記事一覧から見出し・本文・関連場所を抽出」）
+
+【fields と enrichFields の役割分担（最重要）】
+このツールは2段階で抽出を行います。fields と enrichFields は**絶対に重複させない**でください。
+
+- **fields (A〜E列): 基本情報のみ**。PDFを見れば即座に分かる項目。
+  例: no(連番), ジャンル, カテゴリ, ページ番号, 見出し
+  → ここに「内容・詳細」「クイズ」「分析」などは入れない
+
+- **enrichFields (F列以降): 深掘り分析・派生情報のみ**。fieldsの情報をもとにAIが推論・生成する項目。
+  例: 内容詳細, 思惑分析, 理解すべき内容, クイズ, キーワード, 地図JSON, 版種
+  → ここに「no」「見出し」「ページ」など fieldsで定義した項目を再掲しない
+
+【正しい出力形式（厳守）】
+\`\`\`json
+{
+  "preset": "custom",
+  "fields": [
+    { "key": "no",       "label": "No",        "type": "integer", "required": true,  "desc": "1からの連番" },
+    { "key": "genre",    "label": "ジャンル",   "type": "string",  "required": true,  "desc": "分類カテゴリ", "enumValues": "値1,値2,値3" },
+    { "key": "category", "label": "カテゴリ",   "type": "string",  "required": true,  "desc": "セクション名" },
+    { "key": "page",     "label": "PDFページ", "type": "integer", "required": true,  "desc": "PDFの物理ページ番号" },
+    { "key": "headline", "label": "見出し",     "type": "string",  "required": true,  "desc": "記事のメインタイトル" }
+  ],
+  "enrichFields": [
+    { "key": "content_detail", "label": "内容・詳細",    "type": "string", "long": true,  "desc": "300字程度の解説" },
+    { "key": "intent_motive",  "label": "思惑と狙い",     "type": "string", "long": true,  "desc": "関係者の真の意図を分析" },
+    { "key": "key_insights",   "label": "理解すべき内容", "type": "string", "long": true,  "desc": "なぜ重要か" },
+    { "key": "quiz_q",         "label": "クイズ(問)",     "type": "string", "long": false, "desc": "問題文" },
+    { "key": "quiz_a",         "label": "クイズ(解)",     "type": "string", "long": false, "desc": "解答" },
+    { "key": "keyword",        "label": "キーワード解説", "type": "string", "long": false, "desc": "専門用語の解説" },
+    { "key": "map_json",       "label": "地図の住所(JSON)", "type": "string", "long": false, "desc": "単一行JSON: {\\"location\\":\\"名称\\",\\"latitude\\":0.0,\\"longitude\\":0.0}" },
+    { "key": "edition",        "label": "版種",          "type": "string", "long": false, "desc": "版種コード", "enumValues": "m,e,r,p" }
+  ],
+  "enrichEnabled": true,
+  "enrichLabel": "F〜M列も生成",
+  "itemsPerPage": 5,
+  "role": "あなたは○○の専門家です。",
+  "rules": "・広告は除外\\n・各ページから3記事以上抽出"
+}
+\`\`\`
+
+【フィールド仕様】
+- key: 英小文字・アンダースコアのみ（出力JSONの実際のキー名）。"new_field1" などの仮名は禁止。意味のある名前を付ける
+- label: 日本語表示名（Excel列ヘッダーになる）
+- type: "string" | "integer" | "number"
+- required: true/false（必須項目か）
+- desc: AIに対する詳細指示（プロンプトに展開される）
+- enumValues: カンマ区切り文字列（指定値からの選択）
+- long: true=長文項目（深掘り分析用）
+
+【検証チェック（出力前に必ず確認）】
+1. fields と enrichFields の label が重複していないか？
+   （例: fields に「見出し」があるなら、enrichFields にも「見出し」を入れない）
+2. fields と enrichFields の key が重複していないか？
+3. key が "new_field数字" のような仮名になっていないか？
+4. すべての key が英小文字とアンダースコアのみか？
+
+このフォーマット通りに、**コードブロック1個だけ** で返してください。説明文や前置きは不要です。`;
+
+  try {
+    await navigator.clipboard.writeText(promptText);
+    log('📋 スキーマ作成プロンプトをコピーしました。Geminiに貼って、要件を追記して使ってください', 'ok');
+    flashButton($('copySchemaPromptBtn'), '✓ コピー済み');
+  } catch (err) {
+    // Fallback: show in a popup
+    prompt('このテキストをコピーしてください:', promptText);
+  }
+});
+
+function flashButton(btn, msg) {
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.textContent = msg;
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }, 1500);
+}
+
+$('rolePrompt').addEventListener('input', updateCostEstimate);
+$('extractionRules').addEventListener('input', updateCostEstimate);
+
+// =====================================================================
+// COST CALCULATOR
+// =====================================================================
+function estimateOutputTokensPerItem(fields) {
+  let tok = 30; // JSON overhead per item ({}, commas, keys)
+  fields.forEach(f => {
+    tok += (f.key || '').length * 0.3; // key as token
+    if (f.type === 'integer' || f.type === 'number') {
+      tok += 5;
+    } else {
+      // string: estimate from description hints
+      const d = (f.desc || '').toLowerCase();
+      if (/300字|200字|要約|詳細|本文|条文|解説|分析/.test(f.desc || '')) {
+        tok += TOKENS_PER_LONG_FIELD;
+      } else {
+        tok += TOKENS_PER_SHORT_FIELD;
+      }
+    }
+  });
+  return Math.round(tok);
+}
+
+function calculateCost() {
+  if (!state.pdfPageCount) return null;
+  const model = $('model').value;
+  const pricing = PRICING[model];
+  if (!pricing) return null;
+
+  const batchSize = parseInt($('batchSize').value) || 5;
+  const pages = state.pdfPageCount;
+  const calls = Math.ceil(pages / batchSize);
+  const itemsPerPage = state.schema.itemsPerPage || ITEMS_PER_PAGE_DEFAULT;
+  const totalItems = pages * itemsPerPage;
+
+  // Phase 1: Extraction
+  // Each call sends: prompt + schema description + (batchSize) PDF page images
+  const promptTextTok = TOKENS_PROMPT_OVERHEAD
+    + ($('rolePrompt').value.length * 0.5)
+    + ($('extractionRules').value.length * 0.5)
+    + (state.schema.fields.reduce((s, f) => s + (f.desc||'').length * 0.5 + 10, 0));
+  const inputPerCall = (batchSize * TOKENS_PER_PAGE_IMAGE) + promptTextTok;
+  const totalInputTok = inputPerCall * calls;
+
+  const outputPerItem = estimateOutputTokensPerItem(state.schema.fields);
+  const outputPerCall = batchSize * itemsPerPage * outputPerItem;
+  const totalOutputTok = outputPerCall * calls;
+
+  // Phase 2: Enrichment (if any)
+  let enrichInputTok = 0, enrichOutputTok = 0, enrichCalls = 0;
+  if (state.schema.enrichFields && state.schema.enrichFields.length > 0 && $('enrichFM').checked) {
+    const enrichBatchSize = 20;
+    enrichCalls = Math.ceil(totalItems / enrichBatchSize);
+    // Each enrich call sends: the relevant PDF pages again (assume ~enrichBatchSize/itemsPerPage pages)
+    const enrichPagesPerCall = Math.min(pages, Math.ceil(enrichBatchSize / itemsPerPage) + 2);
+    const enrichInputPerCall = (enrichPagesPerCall * TOKENS_PER_PAGE_IMAGE)
+      + (state.schema.enrichFields.reduce((s, f) => s + (f.desc||'').length * 0.5 + 10, 0))
+      + 800; // overhead + article list
+    enrichInputTok = enrichInputPerCall * enrichCalls;
+    const enrichOutPerItem = estimateOutputTokensPerItem(state.schema.enrichFields);
+    enrichOutputTok = enrichBatchSize * enrichOutPerItem * enrichCalls;
+  }
+
+  const grandInputTok = totalInputTok + enrichInputTok;
+  const grandOutputTok = totalOutputTok + enrichOutputTok;
+  const totalCalls = calls + enrichCalls;
+
+  // Pricing — handle tiered (long-context) pricing per call
+  const inputPerCallEff = inputPerCall;
+  const useLongInput = pricing.longThreshold && inputPerCallEff > pricing.longThreshold;
+  const inputRate = useLongInput ? pricing.inLong : pricing.in;
+  const outputRate = useLongInput ? (pricing.outLong || pricing.out) : pricing.out;
+
+  // Enrich rates
+  const enrichInputPerCall = enrichCalls > 0 ? (enrichInputTok / enrichCalls) : 0;
+  const useLongEnrich = pricing.longThreshold && enrichInputPerCall > pricing.longThreshold;
+  const enrichInputRate = useLongEnrich ? pricing.inLong : pricing.in;
+  const enrichOutputRate = useLongEnrich ? (pricing.outLong || pricing.out) : pricing.out;
+
+  const costExtractIn = totalInputTok / 1_000_000 * inputRate;
+  const costExtractOut = totalOutputTok / 1_000_000 * outputRate;
+  const costEnrichIn = enrichInputTok / 1_000_000 * enrichInputRate;
+  const costEnrichOut = enrichOutputTok / 1_000_000 * enrichOutputRate;
+  const costUsd = costExtractIn + costExtractOut + costEnrichIn + costEnrichOut;
+  const usdJpy = parseFloat($('usdJpy').value) || 155;
+  const costJpy = costUsd * usdJpy;
+
+  // Free tier checks (RPD = daily, RPM = per-minute)
+  let freeTierRpd = false;
+  let freeTierRpm = false;
+  const rpd = pricing.freeRpd || 0;
+  const rpm = pricing.freeRpm || 0;
+  if (rpd > 0 && totalCalls <= rpd) freeTierRpd = true;
+
+  // Throttle / timing estimate
+  const intervalMs = getEffectiveCallIntervalMs();
+  const effectiveRpm = intervalMs > 0 ? Math.floor(60_000 / intervalMs) : 999;
+  if (rpm > 0 && effectiveRpm <= rpm) freeTierRpm = true;
+  // Estimated total runtime: assume ~5s per call + interval
+  const perCallSeconds = Math.max(5, intervalMs / 1000);
+  const estimatedSeconds = perCallSeconds * totalCalls;
+  const freeTier = freeTierRpd && freeTierRpm;
+
+  return {
+    model, pricing, calls, enrichCalls, totalCalls,
+    inputPerCall, outputPerCall,
+    totalInputTok, totalOutputTok,
+    enrichInputTok, enrichOutputTok,
+    grandInputTok, grandOutputTok,
+    inputRate, outputRate, enrichInputRate, enrichOutputRate,
+    costExtractIn, costExtractOut, costEnrichIn, costEnrichOut,
+    costUsd, costJpy, usdJpy,
+    freeTier, freeTierRpd, freeTierRpm, rpd, rpm, effectiveRpm, intervalMs, estimatedSeconds,
+    pages, batchSize, itemsPerPage, totalItems,
+  };
+}
+
+function fmtTok(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return Math.round(n).toString();
+}
+function fmtJpy(n) {
+  if (n < 0.5) return '< 1';
+  if (n < 100) return n.toFixed(1);
+  if (n < 10000) return Math.round(n).toLocaleString();
+  return Math.round(n).toLocaleString();
+}
+function fmtUsd(n) {
+  if (n < 0.001) return n.toFixed(5);
+  if (n < 1) return n.toFixed(3);
+  return n.toFixed(2);
+}
+
+function updateCostEstimate() {
+  if (!state.pdfPageCount) {
+    $('costJpy').textContent = '—';
+    $('costUsd').textContent = '—';
+    $('costCalls').textContent = '—';
+    $('costInTok').textContent = '—';
+    $('costOutTok').textContent = '—';
+    $('costNote').textContent = 'PDFを読み込むと自動で試算します。';
+    $('costNote').className = 'cost-note';
+    $('costPill').textContent = '待機中';
+    $('costPill').className = 'pill';
+    $('costBreakdown').innerHTML = '';
+    return;
+  }
+  const r = calculateCost();
+  if (!r) return;
+
+  $('costJpy').textContent = fmtJpy(r.costJpy);
+  $('costUsd').textContent = fmtUsd(r.costUsd);
+  $('costCalls').textContent = r.totalCalls;
+  $('costCallsSub').textContent = r.enrichCalls > 0 ? `抽出${r.calls} + 深掘り${r.enrichCalls}` : `抽出${r.calls}回`;
+  $('costInTok').textContent = fmtTok(r.grandInputTok);
+  $('costInTokSub').textContent = `1回あたり ${fmtTok(r.inputPerCall)} (PDF画像 ${r.batchSize}p)`;
+  $('costOutTok').textContent = fmtTok(r.grandOutputTok);
+  $('costOutTokSub').textContent = `想定 ${r.totalItems} 件 × ${r.itemsPerPage}/頁`;
+
+  // === Cost note ===
+  let noteHtml = '';
+  if (r.costJpy < 1) {
+    noteHtml = `<strong>ほぼ無料です。</strong> ${MODEL_LABELS[r.model]} は無料枠 (1日${r.pricing.freeRpd||0}回) で十分処理できます。${r.totalCalls}回のAPI呼び出しは無料枠の範囲内です。`;
+    $('costPill').textContent = '無料枠OK';
+    $('costPill').className = 'pill free';
+    $('costNote').className = 'cost-note ok';
+  } else if (r.freeTier) {
+    noteHtml = `<strong>無料枠で処理可能です。</strong> ${r.totalCalls}回 ≤ 1日${r.rpd}回。有料枠なら約 <strong>¥${fmtJpy(r.costJpy)}</strong>。`;
+    $('costPill').textContent = '無料枠OK';
+    $('costPill').className = 'pill free';
+    $('costNote').className = 'cost-note ok';
+  } else if (r.costJpy < 50) {
+    noteHtml = `安価です。約 <strong>¥${fmtJpy(r.costJpy)}</strong> で実行できます。`;
+    $('costPill').textContent = '低コスト';
+    $('costPill').className = 'pill cheap';
+    $('costNote').className = 'cost-note ok';
+  } else if (r.costJpy < 500) {
+    noteHtml = `1回の実行で約 <strong>¥${fmtJpy(r.costJpy)}</strong>。Flash系モデルへの切り替えで大幅にコストを抑えられます。`;
+    $('costPill').textContent = '中コスト';
+    $('costPill').className = 'pill';
+    $('costNote').className = 'cost-note';
+  } else {
+    noteHtml = `<strong>注意:</strong> 1回の実行で約 <strong>¥${fmtJpy(r.costJpy)}</strong>。Pro モデル使用時はトークン数が大きいページで割増料金になります。まずは Flash 系で試すことを推奨します。`;
+    $('costPill').textContent = '高コスト';
+    $('costPill').className = 'pill';
+    $('costNote').className = 'cost-note';
+  }
+
+  // === Rate-limit warning (appended to note) ===
+  if (r.rpm > 0) {
+    const mins = Math.ceil(r.estimatedSeconds / 60);
+    if (!r.freeTierRpm) {
+      noteHtml += `<br><br><strong style="color: var(--err);">⚠ レート制限の警告:</strong> 無料枠 ${MODEL_LABELS[r.model]} は <strong>${r.rpm} RPM</strong> 上限。現在の呼出間隔(${(r.intervalMs/1000).toFixed(1)}秒 = ${r.effectiveRpm} RPM)では429エラーになる可能性。<br><strong>対策:</strong> 「無料枠セーフモード」をON、またはバッチサイズを大きく、または呼出間隔を ${Math.ceil(60/r.rpm * 1.2)}秒以上に設定。`;
+      $('costNote').className = 'cost-note';
+    } else {
+      noteHtml += `<br><span style="color: var(--gray); font-size: 11px;">⏱ 推定実行時間: 約 <strong>${mins}分</strong> (呼出間隔 ${(r.intervalMs/1000).toFixed(1)}秒 × ${r.totalCalls}回)</span>`;
+    }
+  }
+  $('costNote').innerHTML = noteHtml;
+
+  // === Breakdown ===
+  const longNote = (r.inputPerCall > (r.pricing.longThreshold || 999999999)) ? `（長文プロンプト料金適用: 1回 ${fmtTok(r.inputPerCall)} > ${fmtTok(r.pricing.longThreshold)} 閾値）` : '';
+  $('costBreakdown').innerHTML = `
+    <table>
+      <tr><td>モデル</td><td>${MODEL_LABELS[r.model]}</td></tr>
+      <tr><td>入力単価</td><td>$${r.inputRate.toFixed(3)} / 1M tok</td></tr>
+      <tr><td>出力単価</td><td>$${r.outputRate.toFixed(3)} / 1M tok</td></tr>
+      <tr><td>無料枠</td><td>${r.rpm} RPM / ${r.rpd} RPD</td></tr>
+      <tr><td>呼出間隔</td><td>${(r.intervalMs/1000).toFixed(1)}秒 (${r.effectiveRpm} RPM)</td></tr>
+      <tr><td>推定実行時間</td><td>約 ${Math.ceil(r.estimatedSeconds/60)}分</td></tr>
+      <tr><td>抽出フェーズ 入力</td><td>${fmtTok(r.totalInputTok)} tok = $${fmtUsd(r.costExtractIn)}</td></tr>
+      <tr><td>抽出フェーズ 出力</td><td>${fmtTok(r.totalOutputTok)} tok = $${fmtUsd(r.costExtractOut)}</td></tr>
+      ${r.enrichCalls > 0 ? `
+        <tr><td>深掘り 入力</td><td>${fmtTok(r.enrichInputTok)} tok = $${fmtUsd(r.costEnrichIn)}</td></tr>
+        <tr><td>深掘り 出力</td><td>${fmtTok(r.enrichOutputTok)} tok = $${fmtUsd(r.costEnrichOut)}</td></tr>
+      ` : ''}
+      <tr><td><strong>合計 (USD)</strong></td><td><strong>$${fmtUsd(r.costUsd)}</strong></td></tr>
+      <tr><td><strong>合計 (JPY @ ${r.usdJpy})</strong></td><td><strong>¥${fmtJpy(r.costJpy)}</strong></td></tr>
+    </table>
+    ${longNote ? `<div style="margin-top:8px; color: var(--warn);">${longNote}</div>` : ''}
+
+    <div style="margin-top:18px; padding-top:14px; border-top: 1px dashed var(--line);">
+      <div style="font-family:'Noto Sans JP',sans-serif; font-weight:700; font-size:12px; color:var(--ink); margin-bottom:8px;">
+        モデル別 1000回呼出あたりの有料コスト（現在の設定で換算）
+      </div>
+      <div style="font-size:10px; color:var(--gray); margin-bottom:8px; line-height:1.6;">
+        1回あたり入力 ${fmtTok(r.inputPerCall)} + 出力 ${fmtTok(r.totalOutputTok / Math.max(r.calls, 1) | 0)} を基準。<br>
+        ※ 無料枠を超えた分は自動で有料枠に切り替わります。Tier 1 で課金有効化が必要。
+      </div>
+      <table style="font-size:12px; width:100%;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--line);">
+            <th style="text-align:left; padding:6px 4px;">モデル</th>
+            <th style="text-align:right; padding:6px 4px;">入力<br><span style="font-size:9px; color:var(--gray);">$/1M</span></th>
+            <th style="text-align:right; padding:6px 4px;">出力<br><span style="font-size:9px; color:var(--gray);">$/1M</span></th>
+            <th style="text-align:right; padding:6px 4px;">無料枠<br><span style="font-size:9px; color:var(--gray);">/日</span></th>
+            <th style="text-align:right; padding:6px 4px;">1000回コスト<br><span style="font-size:9px; color:var(--gray);">JPY</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${buildModelComparisonRows(r)}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:10px; font-size:10px; color: var(--gray);">
+      ※ 試算は PDFページ1枚 ≈ ${TOKENS_PER_PAGE_IMAGE} 入力トークン、1ページあたり ${r.itemsPerPage} 件の抽出を前提。実際は内容により ±30%程度変動します。
+    </div>
+  `;
+}
+
+// Build the per-model 1000-call cost comparison rows
+function buildModelComparisonRows(r) {
+  const usdJpy = r.usdJpy || 155;
+  const inputPerCall = r.inputPerCall;
+  const outputPerCall = r.calls > 0 ? r.totalOutputTok / r.calls : 0;
+  const currentModel = r.model;
+  let html = '';
+  for (const modelId of Object.keys(PRICING)) {
+    const p = PRICING[modelId];
+    // Pick the right rate based on input length
+    const useLongRate = p.longThreshold && inputPerCall > p.longThreshold;
+    const inRate = useLongRate && p.inLong ? p.inLong : p.in;
+    const outRate = useLongRate && p.outLong ? p.outLong : p.out;
+    // Per-1000-call cost
+    const inTokens1k = (inputPerCall * 1000) / 1_000_000;
+    const outTokens1k = (outputPerCall * 1000) / 1_000_000;
+    const cost1kUsd = inTokens1k * inRate + outTokens1k * outRate;
+    const cost1kJpy = cost1kUsd * usdJpy;
+    const isCurrent = modelId === currentModel;
+    const rowStyle = isCurrent
+      ? 'background: rgba(184, 36, 42, 0.08); font-weight: 700;'
+      : '';
+    html += `<tr style="${rowStyle} border-bottom: 1px solid var(--line-soft);">
+      <td style="padding:6px 4px;">${isCurrent ? '▶ ' : ''}${MODEL_LABELS[modelId] || modelId}</td>
+      <td style="padding:6px 4px; text-align:right;">$${inRate.toFixed(2)}</td>
+      <td style="padding:6px 4px; text-align:right;">$${outRate.toFixed(2)}</td>
+      <td style="padding:6px 4px; text-align:right;">${p.freeRpd}</td>
+      <td style="padding:6px 4px; text-align:right;">¥${fmtJpy(cost1kJpy)}</td>
+    </tr>`;
+  }
+  return html;
+}
+
+$('model').addEventListener('change', () => { updateCallIntervalUi(); updateCostEstimate(); });
+$('batchSize').addEventListener('input', updateCostEstimate);
+$('enrichFM').addEventListener('change', updateCostEstimate);
+$('usdJpy').addEventListener('input', updateCostEstimate);
+$('callInterval').addEventListener('input', updateCostEstimate);
+$('freeTierSafe').addEventListener('change', () => { updateCallIntervalUi(); updateCostEstimate(); });
+
+// Update the call interval input to reflect free-tier-safe mode
+function updateCallIntervalUi() {
+  const safe = $('freeTierSafe').checked;
+  const model = $('model').value;
+  const rpm = PRICING[model]?.freeRpm || 10;
+  const safeSec = (60 / rpm * 1.2).toFixed(1);
+  if (safe) {
+    $('callInterval').value = safeSec;
+    $('callInterval').disabled = true;
+    $('callIntervalDesc').innerHTML = `<strong>セーフモードON</strong>: ${MODEL_LABELS[model]}の無料枠 ${rpm} RPM に合わせて自動設定。`;
+  } else {
+    $('callInterval').disabled = false;
+    $('callIntervalDesc').innerHTML = `RPM制限回避用。<strong>${rpm} RPM以下</strong>なら ${safeSec}秒以上推奨。`;
+  }
+}
+
+// =====================================================================
+// PDF.js worker
+// =====================================================================
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// =====================================================================
+// File handling
+// =====================================================================
+const dropzone = $('dropzone');
+const fileInput = $('fileInput');
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+async function handleFile(file) {
+  if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
+    alert('PDFファイルを選択してください');
+    return;
+  }
+  // Warn for very large PDFs (>30MB) — iPad Safari may struggle
+  if (file.size > 30 * 1024 * 1024) {
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    const proceed = confirm(`⚠ このPDFは ${sizeMB} MB と大きく、iPadのメモリを圧迫する可能性があります。\n\n対策:\n・小さいバッチサイズ（3〜5）で実行する\n・Macで「写真」アプリのPDFは画像が高解像度なので、可能なら別アプリで圧縮する\n\nこのまま続行しますか？`);
+    if (!proceed) return;
+  }
+  state.pdfFile = file;
+  state.pageImageCache = new Map();
+  try {
+    const ab = await file.arrayBuffer();
+    // disableAutoFetch + disableStream: load only what we need, when we need it
+    const pdf = await pdfjsLib.getDocument({
+      data: ab,
+      disableAutoFetch: true,
+      disableStream: true,
+    }).promise;
+    state.pdfDoc = pdf;
+    state.pdfPageCount = pdf.numPages;
+  } catch (err) {
+    alert('PDFの解析に失敗: ' + err.message);
+    return;
+  }
+  renderPdfInfo();
+  updateStartBtn();
+  updateCostEstimate();
+}
+
+function renderPdfInfo() {
+  const f = state.pdfFile;
+  const sizeKB = (f.size / 1024).toFixed(0);
+  const sizeMB = (f.size / 1024 / 1024).toFixed(2);
+  const sizeStr = f.size > 1024 * 1024 ? `${sizeMB} MB` : `${sizeKB} KB`;
+  const editionCode = detectEdition(f.name);
+  const editionLabel = ({m:'朝刊', e:'夕刊', r:'地方版', p:'プラス1'})[editionCode] || '—';
+  dropzone.classList.add('loaded');
+  dropzone.innerHTML = `
+    <div class="pdf-info">
+      <div class="pdf-icon">PDF</div>
+      <div class="pdf-details">
+        <div class="pdf-name">${escapeHtml(f.name)}</div>
+        <div class="pdf-stats">${state.pdfPageCount}ページ · ${sizeStr}${editionCode !== '?' ? ` · 版種：<strong>${editionLabel} (${editionCode})</strong>` : ''}</div>
+      </div>
+    </div>
+  `;
+}
+
+function detectEdition(filename) {
+  const base = filename.replace(/\.pdf$/i, '');
+  const last = base.slice(-1).toLowerCase();
+  if (['m','e','r','p'].includes(last)) return last;
+  return '?';
+}
+
+// =====================================================================
+// Inputs / Start button
+// =====================================================================
+$('apiKey').value = localStorage.getItem('geminiApiKey') || '';
+$('apiKey').addEventListener('input', () => {
+  localStorage.setItem('geminiApiKey', $('apiKey').value.trim());
+  updateStartBtn();
+});
+function updateStartBtn() {
+  const manual = $('runMode')?.value === 'manual';
+  const ok = state.pdfDoc && (manual || $('apiKey').value.trim().length > 10);
+  $('startBtn').disabled = !ok || state.running;
+  $('testRunBtn').disabled = !ok || state.running;
+}
+$('runMode').addEventListener('change', updateStartBtn);
+$('resetBtn').addEventListener('click', () => {
+  if (confirm('現在の作業データを破棄してリセットしますか？\n保存された前回データも消去されます。')) {
+    clearSession().finally(() => location.reload());
+  }
+});
+
+// =====================================================================
+// Logging
+// =====================================================================
+const logEl = $('progressLog');
+function log(msg, level = 'info') {
+  $('progressSection').classList.remove('hidden');
+  const t = new Date();
+  const time = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+  const entry = document.createElement('div');
+  entry.className = `log-entry log-${level}`;
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg">${msg}</span>`;
+  logEl.appendChild(entry);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setStatus(s) { $('progressStatus').innerHTML = s; }
+
+// =====================================================================
+// Dynamic JSON schema builder for Gemini structured output
+// =====================================================================
+function buildExtractionJsonSchema() {
+  const properties = {};
+  const required = [];
+  state.schema.fields.forEach(f => {
+    const prop = { type: f.type || 'string', description: f.desc || '' };
+    if (f.enumValues) {
+      prop.enum = f.enumValues.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    properties[f.key] = prop;
+    if (f.required) required.push(f.key);
+  });
+  return {
+    type: "array",
+    items: { type: "object", properties, required }
+  };
+}
+
+function buildEnrichmentJsonSchema() {
+  if (!state.schema.enrichFields) return null;
+  const properties = { no: { type: 'integer' } };
+  const required = ['no'];
+  state.schema.enrichFields.forEach(f => {
+    const prop = { type: f.type || 'string', description: f.desc || '' };
+    if (f.enumValues) {
+      prop.enum = f.enumValues.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    properties[f.key] = prop;
+    required.push(f.key);
+  });
+  return { type: "array", items: { type: "object", properties, required } };
+}
+
+// =====================================================================
+// PDF page rendering for Gemini
+// =====================================================================
+async function renderPageForGemini(pageNum) {
+  if (state.pageImageCache.has(pageNum)) return state.pageImageCache.get(pageNum);
+  if (!state.pdfDoc) throw new Error('PDFが読み込まれていません');
+  const page = await state.pdfDoc.getPage(pageNum);
+  const vp1 = page.getViewport({ scale: 1 });
+  const maxW = 1800;
+  const scale = Math.min(2.0, maxW / vp1.width);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+  const base64 = dataUrl.split(',')[1];
+  // Free canvas memory aggressively (especially important on iPad)
+  canvas.width = 0; canvas.height = 0;
+  if (typeof page.cleanup === 'function') page.cleanup();
+  const part = { inline_data: { mime_type: 'image/jpeg', data: base64 } };
+  state.pageImageCache.set(pageNum, part);
+  // LRU eviction: don't let cache exceed ~10 pages (~5-10MB)
+  // This prevents memory exhaustion on big PDFs (e.g. 22 pages × 2.8MB = 60MB)
+  const MAX_CACHE = 10;
+  if (state.pageImageCache.size > MAX_CACHE) {
+    const oldestKey = state.pageImageCache.keys().next().value;
+    if (oldestKey !== pageNum) {
+      state.pageImageCache.delete(oldestKey);
+    }
+  }
+  return part;
+}
+
+// Explicitly free all cached page images. Call between batches for large PDFs.
+function clearPageImageCache() {
+  state.pageImageCache.clear();
+}
+
+async function renderPagesForGemini(pages) {
+  const unique = [...new Set(pages)]
+    .map(n => parseInt(n, 10))
+    .filter(n => Number.isInteger(n) && n >= 1 && n <= state.pdfPageCount)
+    .sort((a, b) => a - b);
+  const parts = [];
+  for (const pageNum of unique) {
+    parts.push({ text: `--- PDF page ${pageNum} ---` });
+    parts.push(await renderPageForGemini(pageNum));
+  }
+  return parts;
+}
+
+// Send page range as a split PDF (more reliable than images for text-heavy PDFs).
+// Returns parts array with a single PDF inline_data + a label.
+// Falls back to null if pdf-lib unavailable or split fails — caller should retry with images.
+async function renderPagesAsPdfForGemini(pages) {
+  if (typeof PDFLib === 'undefined' || !state.pdfFile) return null;
+  const unique = [...new Set(pages)]
+    .map(n => parseInt(n, 10))
+    .filter(n => Number.isInteger(n) && n >= 1 && n <= state.pdfPageCount)
+    .sort((a, b) => a - b);
+  if (unique.length === 0) return null;
+
+  try {
+    const ab = await state.pdfFile.arrayBuffer();
+    const srcPdf = await PDFLib.PDFDocument.load(ab, { ignoreEncryption: true });
+    const newPdf = await PDFLib.PDFDocument.create();
+    const indices = unique.map(p => p - 1);
+    const copied = await newPdf.copyPages(srcPdf, indices);
+    copied.forEach(p => newPdf.addPage(p));
+    const bytes = await newPdf.save({ useObjectStreams: true });
+
+    // Convert to base64 (chunked to avoid call stack overflow on large buffers)
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    const base64 = btoa(binary);
+
+    // Build page-mapping label so Gemini knows which page is which
+    const minPage = unique[0];
+    const maxPage = unique[unique.length - 1];
+    let mappingNote;
+    if (unique.length === maxPage - minPage + 1) {
+      mappingNote = `[添付PDFの1ページ目=元PDFのP${minPage}、添付PDFの${unique.length}ページ目=元PDFのP${maxPage}]`;
+    } else {
+      const map = unique.map((p, i) => `添付P${i+1}=元P${p}`).join(', ');
+      mappingNote = `[ページ対応: ${map}]`;
+    }
+
+    return [
+      { text: mappingNote },
+      { inline_data: { mime_type: 'application/pdf', data: base64 } }
+    ];
+  } catch (err) {
+    console.warn('PDF split failed, will fallback to images:', err);
+    return null;
+  }
+}
+
+function extractJsonText(data) {
+  const cand = data.candidates?.[0];
+  if (!cand) throw new Error('Geminiから応答がありませんでした');
+  const parts = cand.content?.parts || [];
+  const text = parts.map(p => p.text || '').join('').trim();
+  if (!text) throw new Error('Gemini応答にテキストが含まれていません');
+  return text.replace(/^```(?:json)?\s*/i, '').replace(/```$/,'').trim();
+}
+
+// =====================================================================
+// Gemini API call
+// =====================================================================
+async function callGemini(prompt, schema, opts = {}) {
+  // === THROTTLE: enforce minimum interval between API calls ===
+  const intervalMs = getEffectiveCallIntervalMs();
+  if (intervalMs > 0 && state.lastApiCallAt > 0) {
+    const elapsed = Date.now() - state.lastApiCallAt;
+    const waitMs = intervalMs - elapsed;
+    if (waitMs > 100) {
+      log(`  ⏱ レート制限回避のため ${(waitMs/1000).toFixed(1)}秒待機`, 'info');
+      await sleep(waitMs);
+    }
+  }
+  state.lastApiCallAt = Date.now();
+
+  const apiKey = $('apiKey').value.trim();
+  const model = $('model').value;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  // Build parts: prefer split-PDF (more reliable, smaller), fall back to images
+  // if PDF approach fails or library is unavailable.
+  const parts = [{ text: prompt }];
+  let usingPdf = false;
+  if (opts.pages?.length) {
+    const pdfParts = await renderPagesAsPdfForGemini(opts.pages);
+    if (pdfParts) {
+      parts.push(...pdfParts);
+      usingPdf = true;
+      // Log mode on first call of a run
+      if (!state._pdfModeLogged) {
+        if (typeof log === 'function') log(`📎 送信方式: 分割PDF (各バッチごとに該当ページのみ抽出して添付)`, 'info');
+        state._pdfModeLogged = true;
+      }
+    } else {
+      // Fallback: image-based rendering
+      parts.push(...await renderPagesForGemini(opts.pages));
+      if (!state._imgModeLogged) {
+        if (typeof log === 'function') log(`🖼 送信方式: 画像 (PDF分割が利用不可)`, 'info');
+        state._imgModeLogged = true;
+      }
+    }
+  }
+
+  // Token budget — all current models (2.5 family) support 65536 output tokens
+  const maxTok = 65536;
+
+  const makeBody = (snakeCase = false) => ({
+    contents: [{ role: 'user', parts }],
+    generationConfig: snakeCase ? {
+      response_mime_type: 'application/json',
+      response_schema: schema,
+      temperature: 0.1,
+      max_output_tokens: maxTok
+    } : {
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+      temperature: 0.1,
+      maxOutputTokens: maxTok
+    }
+  });
+
+  async function postBody(body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  }
+
+  let resp = await postBody(makeBody(false));
+  let errText = '';
+  if (!resp.ok) {
+    errText = await resp.text();
+    if (resp.status === 400 && /responseSchema|responseMimeType|generationConfig|response_schema|response_mime_type/i.test(errText)) {
+      resp = await postBody(makeBody(true));
+      if (!resp.ok) errText = await resp.text();
+    }
+  }
+
+  // AUTO-FALLBACK: if PDF mode caused an error (e.g. mime_type rejected, payload too big),
+  // retry once with image-based rendering. This protects against Gemini API quirks where
+  // certain models or accounts don't accept inline PDF.
+  if (!resp.ok && usingPdf && opts.pages?.length) {
+    const isPdfRelatedError = /pdf|mime_type|inline_data|payload|size|unsupported/i.test(errText)
+      || resp.status === 413  // Payload too large
+      || (resp.status === 400 && !/responseSchema|responseMimeType|generationConfig/i.test(errText));
+    if (isPdfRelatedError) {
+      if (typeof log === 'function') {
+        log(`  ⚠ PDF送信が失敗 (${resp.status})。画像送信で再試行します`, 'warn');
+      }
+      // Rebuild parts with images
+      const imgParts = [{ text: prompt }, ...await renderPagesForGemini(opts.pages)];
+      const fallbackBody = makeBody(false);
+      fallbackBody.contents[0].parts = imgParts;
+      resp = await postBody(fallbackBody);
+      if (!resp.ok) errText = await resp.text();
+      usingPdf = false;
+    }
+  }
+
+  if (!resp.ok) {
+    const err = new Error(`Gemini API ${resp.status}: ${errText.slice(0, 700)}`);
+    err.status = resp.status;
+    err.retryAfterMs = parseGeminiRetryMs(errText);
+    // Detect daily quota / billing quota — these require waiting or upgrading plan
+    if (resp.status === 429) {
+      if (/per\s*day|daily|free_tier.*request|exceeded your current quota|billing details/i.test(errText)) {
+        err.isDailyQuota = true;
+      }
+    }
+    throw err;
+  }
+  const data = await resp.json();
+
+  // Check finish_reason to detect truncation EARLY
+  const cand = data.candidates?.[0];
+  const finishReason = cand?.finishReason || '';
+  const isTruncated = finishReason === 'MAX_TOKENS';
+
+  let text;
+  try {
+    text = extractJsonText(data);
+  } catch (e) {
+    // If response was empty or unparseable, surface the original error
+    if (isTruncated) {
+      const err = new Error('応答が最大トークン数に達して切れました。バッチサイズを小さくしてください。');
+      err.isTruncated = true;
+      throw err;
+    }
+    throw e;
+  }
+  // Strip cite tags from raw text BEFORE parsing — they sometimes break JSON
+  text = stripCites(text);
+
+  // First attempt: parse as-is
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    // Salvage attempt: response may be truncated mid-element
+    parsed = trySalvagePartialJsonArray(text);
+    if (!parsed) {
+      if (isTruncated) {
+        const err = new Error(`応答が最大トークン数(${maxTok})に達して切れました。バッチサイズを小さくしてください。`);
+        err.isTruncated = true;
+        throw err;
+      }
+      throw new Error('JSONパース失敗: ' + text.slice(0, 300));
+    }
+    // Salvaged — warn the user that some content was lost
+    log(`  ⚠ 応答が切れたため部分的に救出: ${parsed.length}件 (本来より少ない可能性あり)`, 'warn');
+  }
+
+  // Deep clean all cite patterns from parsed JSON
+  const cleaned = deepStripCites(parsed);
+
+  // If truncated but salvageable, attach a flag so caller can split next time
+  if (isTruncated && Array.isArray(cleaned)) {
+    cleaned._truncated = true;
+  }
+  return cleaned;
+}
+
+// Try to recover a partial JSON array — find last complete '}' before truncation
+// and close the array there. Returns parsed array or null.
+function trySalvagePartialJsonArray(text) {
+  const s = text.trim();
+  if (!s.startsWith('[')) return null;
+  // Walk and track brace/string state, find last completed top-level object
+  let depth = 0;
+  let inStr = false;
+  let escape = false;
+  let lastCompleteEnd = -1; // index just after last completed top-level }
+  let inArrayDepth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '[') inArrayDepth++;
+    else if (c === ']') inArrayDepth--;
+    else if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      // Top-level object inside the outer array completed
+      if (depth === 0 && inArrayDepth === 1) {
+        lastCompleteEnd = i + 1;
+      }
+    }
+  }
+  if (lastCompleteEnd < 0) return null;
+  const salvaged = s.slice(0, lastCompleteEnd) + ']';
+  try {
+    const arr = JSON.parse(salvaged);
+    return Array.isArray(arr) ? arr : null;
+  } catch {
+    return null;
+  }
+}
+
+// =====================================================================
+// Dynamic prompt builders
+// =====================================================================
+function buildSchemaDescription(fields) {
+  return fields.map((f, i) => {
+    const enumStr = f.enumValues ? ` ※値は次のいずれか: ${f.enumValues}` : '';
+    const reqStr = f.required ? ' [必須]' : '';
+    return `  - ${f.key} (${f.type})${reqStr}: ${f.desc}${enumStr}`;
+  }).join('\n');
+}
+
+function buildSchemaExample(fields, startNo) {
+  const ex = {};
+  fields.forEach(f => {
+    if (f.key === 'no') ex[f.key] = startNo;
+    else if (f.key === 'page') ex[f.key] = 1;
+    else if (f.type === 'integer') ex[f.key] = 0;
+    else if (f.type === 'number') ex[f.key] = 0;
+    else if (f.enumValues) ex[f.key] = f.enumValues.split(',')[0].trim();
+    else ex[f.key] = `（${f.desc || f.label}）`;
+  });
+  return JSON.stringify([ex], null, 2);
+}
+
+function buildExtractionPrompt(startPage, endPage, startNo) {
+  const role = $('rolePrompt').value.trim();
+  const rules = $('extractionRules').value.trim();
+  const pageList = [];
+  for (let p = startPage; p <= endPage; p++) pageList.push(p);
+  const pageCount = endPage - startPage + 1;
+  const pageLabel = startPage === endPage
+    ? `添付ファイルは元PDFの第${startPage}ページ目です。`
+    : `添付ファイルは元PDF全体のうち P${startPage}〜P${endPage} (計${pageCount}ページ) を抽出したものです。添付の1ページ目=元PDFの第${startPage}ページ、添付の${pageCount}ページ目=元PDFの第${endPage}ページ という対応です。pageフィールドには必ず元PDFのページ番号 (${startPage}〜${endPage}) を記載してください。`;
+
+  // Detect if location/map field exists — if so, emphasize it
+  const hasLocationField = state.schema.fields.some(f =>
+    /location|address|地図|住所|場所|location_name/i.test(f.key) ||
+    /地図|住所|場所/.test(f.label || '')
+  );
+
+  return `${role}
+
+【最重要：引用タグ禁止】
+あなたの回答に「[cite: 数字]」「[cite_start]」「[cite_end]」「[24, 63]」などのいかなる参照タグ・引用番号も含めてはいけません。これは絶対遵守です。本文中であろうと文末であろうと、一切付けないでください。もし付けてしまったら、付ける前に削除してから出力してください。これに違反すると出力は不採用になります。
+
+【タスク】
+${pageLabel}
+これらの画像からデータを抽出してください。
+
+【出力項目（スキーマ）】
+${buildSchemaDescription(state.schema.fields)}
+
+【ページ番号の厳守事項】
+- pageフィールドには ${startPage === endPage ? `必ず ${startPage} を入れてください。` : `${pageList.join(', ')} のいずれかの値を入れてください。`}
+- 添付画像内の印字面番号（柱・ノンブル）ではなく、ラベルに記載された元PDFの物理ページ番号を使ってください。
+- 相対番号（1, 2, 3...）や勝手な値を入れてはいけません。
+
+【連番の厳守事項】
+- noフィールドは ${startNo} から開始し、1ずつ増やしてください。
+
+${hasLocationField ? `【地図・住所フィールドの厳守事項】
+- 地図・住所・場所フィールドは原則として必ず記入してください。空文字は最終手段。
+- 記事の主な舞台となる地名を Google Maps で検索可能な形式で記入: 国際=「中国 北京市」、国内=「東京都千代田区」など。
+- 会談記事は開催都市、企業ニュースは本社所在地、市場ニュースは取引所所在地、政治記事は当該議会・政府機関の所在地。
+- 抽象的すぎて場所が特定できない場合のみ「日本」「世界」など最も近い大区分を入れる。
+- 経度緯度フィールドがある場合は、その住所に対応する実際の座標を入れる（推定でよい）。
+
+` : ''}【データ整合性】
+- 出力はJSONスキーマに厳密に従う（追加フィールドや欠落を禁止）
+- 該当データがない項目は空文字列 "" または 0 で埋め、null や undefined は使わない
+
+【抽出ルール】
+${rules}
+
+【禁止事項（再掲・厳守）】
+- 「[cite: 24, 63]」「[cite_start]」「[24, 63]」のような引用タグは絶対に出力しないこと
+- 数学記号（∑、√、∞、∫、≠、≒、≤、≥）は使用禁止。日本語で表現すること`;
+}
+
+function buildEnrichmentPrompt(articleBatch, editionCode) {
+  const role = $('rolePrompt').value.trim();
+
+  // Detect if location/map field exists in enrichment
+  const hasLocationField = state.schema.enrichFields && state.schema.enrichFields.some(f =>
+    /location|address|地図|住所|場所|location_name/i.test(f.key) ||
+    /地図|住所|場所/.test(f.label || '')
+  );
+
+  return `${role}
+
+【最重要：引用タグ禁止】
+あなたの回答に「[cite: 数字]」「[cite_start]」「[cite_end]」「[24, 63]」などのいかなる参照タグ・引用番号も含めてはいけません。これは絶対遵守です。本文中であろうと文末であろうと、一切付けないでください。
+
+以下の記事/項目について、追加フィールドを生成してください。記事の本文は添付PDFを参照してください。
+
+【入力データ】
+${JSON.stringify(articleBatch, null, 2)}
+
+【ファイルから判定された版種】
+${editionCode}
+
+【生成項目】
+${buildSchemaDescription(state.schema.enrichFields)}
+
+【トーン＆マナー】
+専門的で読者層に適した知的な表現。事実の羅列でなく洞察に満ちた分析を行うこと。
+
+${hasLocationField ? `【地図・住所フィールドの厳守事項】
+- 地図・住所・場所フィールドは原則として必ず記入してください。空文字は最終手段。
+- 記事の主な舞台となる地名を Google Maps で検索可能な形式で記入: 国際=「中国 北京市」、国内=「東京都千代田区」など。
+- 会談記事は開催都市、企業ニュースは本社所在地、市場ニュースは取引所所在地、政治記事は当該議会・政府機関の所在地。
+- 経度緯度フィールドがある場合は、その住所に対応する実際の座標を入れる（推定でよい）。
+
+` : ''}【禁止事項（再掲・厳守）】
+- 「[cite: 24, 63]」「[cite_start]」「[24, 63]」のような引用タグは絶対に出力しないこと
+- 数学記号（∑、√、∞、∫、≠、≒、≤、≥）はTTSで読み上げできないため使用禁止
+
+入力データの no を必ず保持してください。`;
+}
+
+// =====================================================================
+// Manual Gemini workflow
+// =====================================================================
+function makeManualPrompt(kind, payload) {
+  const base = `【最重要：引用タグ禁止】
+あなたの回答に「[cite: 数字]」「[cite_start]」「[cite_end]」「[24, 63]」などのいかなる参照タグ・引用番号も含めてはいけません。これは絶対遵守です。本文中であろうと文末であろうと、一切付けないでください。引用タグが付くと出力は不採用になります。
+
+【最重要：出力の完結性】
+回答が長くなる場合でも、必ず JSONを最後まで完結させてください（最後に \`]\` で閉じる）。
+- 文字数制限が来る前に、出力する記事数を減らしてでも、必ず完結したJSONで返すこと
+- 途中で「続きは後で」と切ることは絶対禁止
+- 全件が無理なら、最初に「全X件中Y件分を出力します」と明示してから、Y件のみを完結したJSONで返すこと
+- 切れた状態のJSON（最後が \`]\` で終わらない）は不採用
+
+【重要】回答はJSONコードブロック1個だけで返してください。説明文、前置き、表、箇条書きは禁止です。
+必ず \`\`\`json で開始し、\`\`\` で終了してください。
+添付したPDF「${state.pdfFile?.name || ''}」を参照してください。PDFビューアの印字面番号ではなく、PDFの物理ページ番号を使ってください。`;
+
+  // Combined mode: when F-M generation is enabled in manual mode, merge fields + enrichFields
+  // into a single prompt so Gemini outputs all columns in ONE response.
+  // This avoids the inefficient 2-step process (A-E first, then F-M separately).
+  const includeEnrich = kind === 'extract'
+    && $('enrichFM').checked
+    && state.schema.enrichFields
+    && state.schema.enrichFields.length > 0;
+  const allFields = includeEnrich
+    ? [...state.schema.fields, ...state.schema.enrichFields]
+    : (kind === 'extract' ? state.schema.fields : state.schema.enrichFields || []);
+
+  // Detect map/location-related fields for guidance section
+  const hasLocationField = allFields.some(f =>
+    /location|address|地図|住所|場所|map_json/i.test(f.key) ||
+    /地図|住所|場所/.test(f.label || '')
+  );
+  const hasMapJsonField = allFields.some(f =>
+    f.key === 'map_json' || /map_json/i.test(f.key) || /地図.*JSON|地図の住所/.test(f.label || '')
+  );
+  const locationGuide = hasMapJsonField ? `
+
+【地図の住所(JSON)フィールドの厳守事項】
+- 単一行のJSON文字列で記載: { "location": "名称", "latitude": 0.0, "longitude": 0.0 }
+- locationは関連場所の名称: 国際=「中国 北京市」、国内=「東京都千代田区」
+- 会談は開催都市、企業ニュースは本社所在地、市場ニュースは取引所所在地
+- latitude/longitudeは正確な座標を反映（北京なら39.9042, 116.4074）
+- 空欄禁止。極端に抽象的な記事は { "location": "日本", "latitude": 35.6762, "longitude": 139.6503 }
+- JSON文字列内のダブルクオートは \\" でエスケープすること
+- 改行・インデント禁止、必ず1行` : (hasLocationField ? `
+
+【地図・住所フィールドの厳守事項】
+- 必ず記入。空文字は最終手段。
+- 国際=「国名 + 都市名」、国内=「都道府県 + 市区町村」
+- 会談記事は開催都市、企業は本社、市場は取引所所在地。` : '');
+
+  if (kind === 'extract') {
+    const role = $('rolePrompt').value.trim();
+    const rules = $('extractionRules').value.trim();
+    const example = buildSchemaExample(allFields, payload.startNo);
+    const pageCount = payload.endPage - payload.startPage + 1;
+    const enrichNote = includeEnrich
+      ? `\n【一括抽出モード】\nA〜${String.fromCharCode(64 + allFields.length)}列の全${allFields.length}項目を1回の出力に含めてください。基本情報と深掘り分析を同時に生成します。\n`
+      : '';
+    return `${base}
+
+${role}
+
+【添付PDFについて】
+添付されているPDFは元PDF全体の一部 (P${payload.startPage}〜P${payload.endPage}、計${pageCount}ページ) を分割したものです。
+- 添付PDFの1ページ目 = 元PDFの第${payload.startPage}ページ
+- 添付PDFの${pageCount}ページ目 = 元PDFの第${payload.endPage}ページ
+- pageフィールドには **元PDFのページ番号** (${payload.startPage}〜${payload.endPage}) を必ず記載すること
+
+【絶対に禁止事項（最重要）】
+1. Noを飛ばす行為 → ${payload.startNo}から1ずつ連続させること
+2. pageフィールドに ${payload.startPage}〜${payload.endPage} 以外の数字を入れる行為 → 範囲内のみ許可
+3. 引用タグ「[cite: 24, 63]」「[cite_start]」などを出力する行為 → 一切付けない
+4. スキーマで指定した全${allFields.length}項目を必ず全件出力 → 一部だけ出すのは禁止
+
+【処理対象】
+連番開始: No.${payload.startNo} から
+対象ページ範囲: P${payload.startPage}〜P${payload.endPage} (添付PDF全${pageCount}ページ)
+${payload.editionCode !== '?' ? `版種: ${payload.editionCode} (m=朝刊 / e=夕刊 / r=地方版 / p=プラス1)` : ''}
+${enrichNote}
+【出力項目（スキーマ：${allFields.length}項目）】
+${buildSchemaDescription(allFields)}
+
+【抽出ルール】
+${rules}${locationGuide}
+
+【出力例（1件分の例）】
+${example}
+
+【厳守事項】
+- noは${payload.startNo}から1ずつ連続。欠番禁止、飛ばし禁止
+- pageは ${payload.startPage}〜${payload.endPage} の範囲内の元PDFページ番号
+- 添付PDFの全${pageCount}ページから記事を漏らさず抽出。広告・株価表のみ除外
+- 各記事ごとに全${allFields.length}項目すべて埋めること（${includeEnrich ? '内容・詳細、思惑、クイズ、地図JSON、版種まで' : ''}）
+- JSON配列を \`\`\`json のコードブロック1個だけで返す`;
+  }
+
+  // Enrichment-only mode (when combined mode is off, second-step prompt)
+  const role = $('rolePrompt').value.trim();
+  return `${base}
+
+${role}
+
+以下のデータについて、追加フィールドを生成してください。本文は添付PDFを参照してください。
+${payload.editionCode !== '?' ? `版種: ${payload.editionCode} (m=朝刊 / e=夕刊 / r=地方版 / p=プラス1)` : ''}
+
+入力データ:
+${JSON.stringify(payload.articles, null, 2)}
+
+【生成項目】
+${buildSchemaDescription(state.schema.enrichFields)}${locationGuide}
+
+注意:
+- 入力データの no を必ず保持
+- JSON配列を \`\`\`json のコードブロック1個だけで返す
+- 【再掲・厳守】「[cite: 24, 63]」のような引用タグは一切出力しない`;
+}
+
+function startManualWorkflow(opts = {}) {
+  const testOnly = !!opts.testOnly;
+  ensureDefaultEnrichSetting();
+  state.running = true;
+  state.articles = [];
+
+  const batchSize = testOnly ? 1 : (parseInt($('batchSize').value) || 5);
+  const maxPages = testOnly ? 1 : state.pdfPageCount;
+  // Build batch definitions
+  const batches = [];
+  for (let start = 1; start <= maxPages; start += batchSize) {
+    const end = Math.min(start + batchSize - 1, maxPages);
+    batches.push({
+      id: batches.length,
+      startPage: start,
+      endPage: end,
+      status: 'pending',  // pending | editing | done | error
+      articleCount: 0,
+      summary: '',
+    });
+  }
+  state.manual = {
+    parallel: true,
+    batchSize,
+    maxPages,
+    testOnly,
+    batches,
+    prepared: false,
+  };
+
+  logEl.innerHTML = '';
+  $('validationSection').classList.add('hidden');
+  $('resultsSection').classList.add('hidden');
+  $('manualSection').classList.remove('hidden');
+  $('resetBtn').classList.remove('hidden');
+  updateStartBtn();
+  if (testOnly) {
+    log(`<strong>🧪 お試し抽出開始</strong> · ${state.pdfFile.name} · 1ページのみ`, 'bold');
+  } else {
+    log(`<strong>並列手動相談モード開始</strong> · ${state.pdfFile.name} · ${state.pdfPageCount}ページ · ${batches.length}バッチ`, 'bold');
+  }
+  // Render batch grid in initial pending state, but bulk-prep is needed to populate prompts/PDFs
+  renderBatchGrid();
+  $('manualStatus').textContent = `${batches.length}バッチ準備待ち`;
+}
+
+// Render all batch tiles (called whenever state changes)
+function renderBatchGrid() {
+  const m = state.manual;
+  if (!m || !m.batches) return;
+  const editionCode = detectEdition(state.pdfFile?.name || '');
+  const grid = $('batchGrid');
+  const prepared = m.prepared;
+
+  // Show or hide the prep banner
+  $('bulkPrepBtn').textContent = prepared ? '✓ 準備完了（再準備するならタップ）' : '📦 全バッチを一括準備';
+  $('bulkPrepBtn').disabled = false;
+
+  // Build tiles HTML
+  grid.innerHTML = m.batches.map(b => {
+    const statusIcon = b.status === 'done' ? '✓' : b.status === 'error' ? '✕' : b.status === 'editing' ? '…' : '○';
+    const placeholder = prepared
+      ? `Gemini の応答JSONをここに貼り付けると自動で取り込まれます（順番不問）`
+      : `先に「📦 全バッチを一括準備」をタップしてください`;
+    const pdfBtnDisabled = !prepared ? 'disabled' : '';
+    const promptBtnDisabled = !prepared ? 'disabled' : '';
+    return `
+      <div class="batch-tile ${b.status}" data-batch-id="${b.id}">
+        <div class="batch-tile-head">
+          <span class="batch-tile-status">${statusIcon}</span>
+          <span class="batch-tile-title">
+            バッチ ${b.id + 1} / ${m.batches.length}
+            <span class="batch-tile-meta">P${b.startPage}〜P${b.endPage} (${b.endPage - b.startPage + 1}ページ)</span>
+          </span>
+        </div>
+        <div class="batch-tile-actions">
+          <button class="btn btn-secondary btn-sm batch-pdf-btn" data-batch-id="${b.id}" ${pdfBtnDisabled}>📎 PDFダウンロード</button>
+          <button class="btn btn-secondary btn-sm batch-prompt-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>📋 指示文コピー</button>
+          ${b.status === 'done' || b.status === 'error' ? `<button class="btn btn-secondary btn-sm batch-clear-btn" data-batch-id="${b.id}">✕ クリア</button>` : ''}
+        </div>
+        <textarea
+          class="batch-paste"
+          data-batch-id="${b.id}"
+          placeholder="${placeholder}"
+          ${!prepared ? 'disabled' : ''}
+        ></textarea>
+        ${b.summary ? `<div class="batch-tile-summary">${escapeHtml(b.summary)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Bind events
+  grid.querySelectorAll('.batch-pdf-btn').forEach(btn => {
+    btn.addEventListener('click', () => downloadBatchPdf(parseInt(btn.dataset.batchId)));
+  });
+  grid.querySelectorAll('.batch-prompt-btn').forEach(btn => {
+    btn.addEventListener('click', () => copyBatchPrompt(parseInt(btn.dataset.batchId)));
+  });
+  grid.querySelectorAll('.batch-clear-btn').forEach(btn => {
+    btn.addEventListener('click', () => clearBatch(parseInt(btn.dataset.batchId)));
+  });
+  // Auto-import on paste/input — when user pastes JSON, import immediately
+  grid.querySelectorAll('.batch-paste').forEach(ta => {
+    ta.addEventListener('input', debounce(() => {
+      const id = parseInt(ta.dataset.batchId);
+      const text = ta.value.trim();
+      if (text.length < 10) return;
+      // Try to import; if invalid, mark error but keep text
+      importBatchJson(id, text);
+    }, 400));
+  });
+
+  updateOverallStatus();
+}
+
+function updateOverallStatus() {
+  const m = state.manual;
+  if (!m) return;
+  const done = m.batches.filter(b => b.status === 'done').length;
+  const err = m.batches.filter(b => b.status === 'error').length;
+  const total = m.batches.length;
+  let status = `${done}/${total} 完了`;
+  if (err > 0) status += ` (${err}件エラー)`;
+  $('manualStatus').textContent = status;
+}
+
+// Debounce helper
+function debounce(fn, ms) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+// "Bulk prepare" — initialize prompts for all batches (PDFs are generated on-demand per batch)
+$('bulkPrepBtn').addEventListener('click', async () => {
+  const m = state.manual;
+  if (!m) return;
+  $('bulkPrepBtn').disabled = true;
+  $('bulkPrepBtn').textContent = '準備中...';
+  try {
+    // Just mark as prepared — PDF splits and prompt generation happen on-demand per tile
+    m.prepared = true;
+    renderBatchGrid();
+    log(`📦 全 ${m.batches.length} バッチの準備完了。各タイルの「📎 PDFダウンロード」「📋 指示文コピー」を使って並列処理してください`, 'ok');
+  } catch (err) {
+    log(`一括準備エラー: ${err.message}`, 'err');
+    alert('準備に失敗: ' + err.message);
+    $('bulkPrepBtn').disabled = false;
+    $('bulkPrepBtn').textContent = '📦 全バッチを一括準備';
+  }
+});
+
+async function downloadBatchPdf(batchId) {
+  const m = state.manual;
+  const b = m?.batches[batchId];
+  if (!b) return;
+  try {
+    const bytes = await splitPdfPages(b.startPage, b.endPage);
+    const baseName = (state.pdfFile.name || 'extracted.pdf').replace(/\.pdf$/i, '');
+    const splitName = `${baseName}_P${b.startPage}-P${b.endPage}.pdf`;
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = splitName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    const sizeMb = (bytes.byteLength / 1024 / 1024).toFixed(2);
+    log(`📎 バッチ${batchId+1}: ${splitName} (${sizeMb} MB) ダウンロード`, 'ok');
+  } catch (err) {
+    log(`分割PDF作成エラー (バッチ${batchId+1}): ${err.message}`, 'err');
+    alert('PDF作成失敗: ' + err.message);
+  }
+}
+
+async function copyBatchPrompt(batchId) {
+  const m = state.manual;
+  const b = m?.batches[batchId];
+  if (!b) return;
+  // Build prompt for this specific batch
+  // For startNo: use the cumulative count from earlier completed batches (best effort)
+  // Since batches process in parallel, no really reliable startNo — use page-based naming
+  const startNo = (batchId * m.batchSize * 5) + 1; // rough estimate; will be renumbered on merge
+  const editionCode = detectEdition(state.pdfFile.name);
+  const prompt = makeManualPrompt('extract', {
+    startPage: b.startPage,
+    endPage: b.endPage,
+    startNo,
+    editionCode,
+  });
+  try {
+    await navigator.clipboard.writeText(prompt);
+    log(`📋 バッチ${batchId+1}: 指示文をコピーしました`, 'ok');
+    // Visual feedback
+    const btn = document.querySelector(`.batch-prompt-btn[data-batch-id="${batchId}"]`);
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = '✓ コピー済み';
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+    }
+  } catch {
+    // Fallback: show in textarea
+    alert('クリップボード使用不可。Geminiへ手動でコピペしてください。');
+    const ta = document.createElement('textarea');
+    ta.value = prompt;
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+function importBatchJson(batchId, text) {
+  const m = state.manual;
+  const b = m?.batches[batchId];
+  if (!b) return;
+  try {
+    const arr = parseManualResponse(text);
+    if (!Array.isArray(arr) || arr.length === 0) {
+      throw new Error('JSON配列が空です');
+    }
+    // Detect truncation: did the input end with ] or }?
+    const trimmed = String(text).trim().replace(/```\s*$/i, '').trim();
+    const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}'));
+
+    // Validate page numbers fall within this batch's range
+    let outOfRange = 0;
+    arr.forEach(a => {
+      const p = parseInt(a.page);
+      if (!isNaN(p) && (p < b.startPage || p > b.endPage)) outOfRange++;
+    });
+
+    // Store articles attached to this batch
+    b.articles = arr;
+    b.articleCount = arr.length;
+    b.status = wasTruncated ? 'error' : 'done';
+    b.summary = wasTruncated
+      ? `⚠ 途中で切断: ${arr.length}件を救出 (バッチ未完了)`
+      : `✓ ${arr.length}件取り込み${outOfRange > 0 ? ` (⚠ ${outOfRange}件のpageが範囲外)` : ''}`;
+    log(`✓ バッチ${batchId+1} (P${b.startPage}〜P${b.endPage}): ${b.articleCount}件取り込み${wasTruncated ? ' (切断)' : ''}`, wasTruncated ? 'warn' : 'ok');
+
+    // Merge all completed batches into state.articles
+    mergeBatchArticles();
+    renderBatchGrid();  // Re-render to update colors/icons
+    saveSession();
+  } catch (err) {
+    b.articles = null;
+    b.articleCount = 0;
+    b.status = 'error';
+    b.summary = `✕ 取り込みエラー: ${err.message}`;
+    log(`バッチ${batchId+1} 取り込みエラー: ${err.message}`, 'err');
+    renderBatchGrid();
+  }
+}
+
+function clearBatch(batchId) {
+  const m = state.manual;
+  const b = m?.batches[batchId];
+  if (!b) return;
+  b.articles = null;
+  b.articleCount = 0;
+  b.status = 'pending';
+  b.summary = '';
+  mergeBatchArticles();
+  renderBatchGrid();
+  saveSession();
+  log(`バッチ${batchId+1} をクリアしました`, 'info');
+}
+
+// Merge articles from all done batches into state.articles, sorted by page then original order, renumbered.
+function mergeBatchArticles() {
+  const m = state.manual;
+  if (!m) return;
+  const all = [];
+  m.batches.forEach(b => {
+    if ((b.status === 'done' || b.status === 'error') && Array.isArray(b.articles)) {
+      b.articles.forEach((a, idx) => {
+        // Tag with batch id and within-batch order so sorting is stable
+        all.push({ ...a, _batch: b.id, _order: idx });
+      });
+    }
+  });
+  // Sort: by batch id (which equals page order), then by within-batch order
+  all.sort((a, b) => (a._batch - b._batch) || (a._order - b._order));
+  // Renumber no field sequentially
+  all.forEach((a, i) => {
+    if ('no' in a || hasNoField()) a.no = i + 1;
+    delete a._batch;
+    delete a._order;
+  });
+  state.articles = all;
+}
+
+// Test compatibility shim: showManualStep is no longer used in parallel mode,
+// but kept as a no-op to avoid breaking older callers.
+function showManualStep() {
+  // Parallel mode handles UI via renderBatchGrid; nothing to do here.
+}
+
+// ===================================================================
+// Comprehensive cite/citation tag cleaner — handles all known patterns
+// Gemini emits these in many forms; this function strips them all.
+// ===================================================================
+const CITE_PATTERNS = [
+  /\[cite[_\s]*:\s*[\d,\s\-]+\]/gi,         // [cite: 24, 63] or [cite:24]
+  /\[cite[_\s]*start[^\]]*\]/gi,             // [cite_start]
+  /\[cite[_\s]*end[^\]]*\]/gi,               // [cite_end]
+  /\[cite[^\]]{0,40}\]/gi,                   // [cite ...] generic fallback (40-char limit)
+  /\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g,           // Bare [24, 63] reference brackets
+  /\(cite:\s*[\d,\s\-]+\)/gi,                // (cite: 24, 63) parenthesized variant
+  /【cite[^】]*】/gi,                         // 【cite ...】 fullwidth variant
+];
+
+function stripCites(str) {
+  if (typeof str !== 'string') return str;
+  let s = str;
+  for (const re of CITE_PATTERNS) s = s.replace(re, '');
+  // Clean up artifacts left behind
+  s = s.replace(/\s+([、。．，,.])/g, '$1');     // Trailing space before punctuation
+  s = s.replace(/\(\s*\)/g, '');                  // Empty () left behind
+  s = s.replace(/【\s*】/g, '');                  // Empty 【】
+  s = s.replace(/\s{2,}/g, ' ');                  // Collapse double spaces
+  return s.trim();
+}
+
+function deepStripCites(obj) {
+  if (typeof obj === 'string') return stripCites(obj);
+  if (Array.isArray(obj)) return obj.map(deepStripCites);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const k in obj) out[k] = deepStripCites(obj[k]);
+    return out;
+  }
+  return obj;
+}
+
+function coerceInteger(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.round(value);
+  const m = String(value ?? '').match(/-?\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+function normalizeMapJson(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  const s = stripCites(String(value)).replace(/\s+/g, ' ').trim();
+  const first = s.indexOf('{');
+  const last = s.lastIndexOf('}');
+  if (first >= 0 && last > first) {
+    const body = s.slice(first, last + 1);
+    try { return JSON.stringify(JSON.parse(body)); }
+    catch { return body; }
+  }
+  return s;
+}
+
+function normalizeArticleRecord(record) {
+  const out = deepStripCites(record || {});
+  const fieldAliasMap = {
+    keyword: [
+      'keyword_explanation',
+      'keywordExplanation',
+      'keyword_detail',
+      'keywordDetail',
+      'keywords',
+      'キーワード',
+      'キーワード解説',
+      '専門用語解説',
+    ],
+    content_detail: ['contentDetail', '内容・詳細', '内容詳細'],
+    intent_motive: ['intentMotive', '思惑と狙い/本音', '思惑分析', '思惑と狙い'],
+    key_insights: ['keyInsights', '理解すべき内容'],
+    quiz_q: ['quizQ', 'quiz_question', 'クイズ（問）', 'クイズ問'],
+    quiz_a: ['quizA', 'quiz_answer', 'クイズ（解）', 'クイズ解'],
+    map_json: ['mapJson', 'map', '地図の住所', '地図の住所(JSON)', '地図JSON'],
+    edition: ['版種'],
+  };
+  Object.entries(fieldAliasMap).forEach(([key, aliases]) => {
+    if (out[key] !== undefined && out[key] !== null && out[key] !== '') return;
+    const alias = aliases.find(name => out[name] !== undefined && out[name] !== null && out[name] !== '');
+    if (alias) out[key] = out[alias];
+  });
+  if ('no' in out) out.no = coerceInteger(out.no) ?? out.no;
+  if ('page' in out) out.page = coerceInteger(out.page) ?? out.page;
+  if ('map_json' in out) out.map_json = normalizeMapJson(out.map_json);
+  if ('edition' in out && out.edition) out.edition = String(out.edition).toLowerCase().trim();
+  return out;
+}
+
+function parseManualResponse(text) {
+  let cleaned = String(text || '').trim()
+    .replace(/^```(?:json)?\s*/i, '').replace(/```$/,'').trim();
+  // Strip cite tags BEFORE JSON parse — they sometimes break JSON if Gemini
+  // emits them inside strings without proper escaping
+  cleaned = stripCites(cleaned);
+  const first = cleaned.indexOf('[');
+  const last = cleaned.lastIndexOf(']');
+  const body = (first >= 0 && last > first) ? cleaned.slice(first, last + 1) : cleaned;
+
+  // First attempt: parse as-is
+  try {
+    return deepStripCites(JSON.parse(body)).map(normalizeArticleRecord);
+  } catch (firstErr) {
+    // Second attempt: salvage truncated JSON (find last complete object)
+    const salvaged = trySalvagePartialJsonArray(body);
+    if (salvaged && salvaged.length > 0) {
+      return deepStripCites(salvaged).map(normalizeArticleRecord);
+    }
+    // Third attempt: maybe the closing ] is missing. Try to find the start [
+    // and walk until last complete top-level object, then synthesize the close.
+    if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+      const fallback = trySalvagePartialJsonArray(cleaned);
+      if (fallback && fallback.length > 0) {
+        return deepStripCites(fallback).map(normalizeArticleRecord);
+      }
+    }
+    throw firstErr;
+  }
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+// Legacy single-batch handlers — guarded since the UI elements have been removed
+// in favor of the new parallel batch grid. If those IDs ever reappear, the handlers
+// still work; otherwise this is a no-op.
+if ($('copyManualPrompt')) {
+  $('copyManualPrompt').addEventListener('click', async () => {
+    await copyText($('manualPrompt').value);
+    log('指示文をコピーしました', 'ok');
+  });
+}
+if ($('openGemini')) {
+  $('openGemini').addEventListener('click', () => {
+    window.open('https://gemini.google.com/app', '_blank');
+  });
+}
+
+// ===================================================================
+// Split PDF: extract a page range from the loaded PDF as a small new PDF
+// Uses pdf-lib (loaded via CDN). Outputs much smaller file for Gemini upload.
+// ===================================================================
+async function splitPdfPages(startPage, endPage) {
+  if (!state.pdfFile) throw new Error('元PDFが読み込まれていません');
+  if (typeof PDFLib === 'undefined') throw new Error('PDFライブラリが読み込まれていません。ネットワーク接続を確認してください。');
+
+  // Read original PDF bytes
+  const ab = await state.pdfFile.arrayBuffer();
+  const srcPdf = await PDFLib.PDFDocument.load(ab, { ignoreEncryption: true });
+  const totalPages = srcPdf.getPageCount();
+
+  // Validate range
+  const start = Math.max(1, startPage);
+  const end = Math.min(totalPages, endPage);
+  if (start > end) throw new Error(`ページ範囲が不正: ${start}〜${end}`);
+
+  // Create new PDF with only the target pages
+  const newPdf = await PDFLib.PDFDocument.create();
+  const pageIndices = [];
+  for (let p = start; p <= end; p++) pageIndices.push(p - 1); // 0-indexed
+  const copiedPages = await newPdf.copyPages(srcPdf, pageIndices);
+  copiedPages.forEach(page => newPdf.addPage(page));
+
+  const newBytes = await newPdf.save({ useObjectStreams: true });
+  return newBytes;
+}
+
+if ($('downloadSplitPdfBtn')) {
+  $('downloadSplitPdfBtn').addEventListener('click', async () => {
+    const btn = $('downloadSplitPdfBtn');
+    const orig = btn.textContent;
+    try {
+      if (!state.pdfFile) {
+        alert('先にPDFをアップロードしてください');
+        return;
+      }
+      if (!state.currentBatchPages) {
+        alert('現在のバッチページ範囲が不明です');
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spin"></span> 分割PDF作成中...';
+      const { startPage, endPage } = state.currentBatchPages;
+      const bytes = await splitPdfPages(startPage, endPage);
+      const sizeMb = (bytes.byteLength / 1024 / 1024).toFixed(2);
+      const baseName = (state.pdfFile.name || 'extracted.pdf').replace(/\.pdf$/i, '');
+      const splitName = `${baseName}_P${startPage}-P${endPage}.pdf`;
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = splitName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      btn.textContent = `✓ ${splitName} (${sizeMb}MB) ダウンロード完了`;
+      log(`📎 分割PDF作成: ${splitName} (${sizeMb} MB)`, 'ok');
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 3500);
+    } catch (err) {
+      log(`分割PDF作成エラー: ${err.message}`, 'err');
+      alert('分割PDF作成に失敗: ' + err.message);
+      btn.textContent = orig;
+      btn.disabled = false;
+    }
+  });
+}
+
+if ($('importManualResponse')) {
+  $('importManualResponse').addEventListener('click', () => {
+    try {
+      const rawText = $('manualResponse').value;
+      const arr = parseManualResponse(rawText);
+      if (!Array.isArray(arr) || arr.length === 0) throw new Error('JSON配列が空です');
+
+      // Detect if input was likely truncated (no closing ], or didn't end with } or ])
+      const trimmed = rawText.trim().replace(/```\s*$/i, '').trim();
+      const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}'));
+    if (wasTruncated) {
+      log(`⚠ JSONが途中で切れていましたが、${arr.length}件を救出しました。残りはもう一度Geminiに同じ指示を出して取り込んでください`, 'warn');
+    }
+
+    const m = state.manual;
+    if (m.phase === 'extract') {
+      const startNo = state.articles.length + 1;
+      const batchPages = state.currentBatchPages || { startPage: 1, endPage: state.pdfPageCount || 1 };
+      const combinedMode = $('enrichFM').checked && state.schema.enrichFields && state.schema.enrichFields.length > 0;
+      const fieldsToValidate = combinedMode
+        ? [...state.schema.fields, ...state.schema.enrichFields.map(f => ({ ...f, required: true }))]
+        : state.schema.fields;
+      const issues = validateBatch(arr, startNo, batchPages.startPage, batchPages.endPage, { fieldsToValidate });
+      if (issues.length > 0) {
+        throw new Error(`取り込み検証で不備が見つかりました:\n${issues.slice(0, 12).join('\n')}${issues.length > 12 ? `\n...ほか${issues.length - 12}件` : ''}`);
+      }
+      state.articles.push(...arr);
+      log(`✓ 抽出取り込み: ${arr.length}件 (累計${state.articles.length}件)${wasTruncated ? ' (一部のみ救出)' : ''}`, 'ok');
+    } else {
+      const arrClean = arr.map(normalizeArticleRecord);
+      const missingNo = arrClean.filter(e => !e.no).length;
+      if (missingNo > 0) throw new Error(`深掘りJSONに no がない行が ${missingNo}件あります`);
+      const map = new Map(arrClean.map(e => [e.no, e]));
+      state.articles.forEach(a => {
+        const e = map.get(a.no);
+        if (e) Object.assign(a, e);
+      });
+      log(`✓ 深掘り取り込み: ${arr.length}件${wasTruncated ? ' (一部のみ救出)' : ''}`, 'ok');
+    }
+    // Only advance step if NOT truncated — if truncated, stay on same batch so
+    // user can re-run Gemini and import the remaining records
+    if (!wasTruncated) {
+      m.index++;
+    } else {
+      // Show a clear instruction
+      const skipped = m.batchSize ? `(残り${(m.index + 1) * m.batchSize - state.articles.length}件程度)` : '';
+      alert(`⚠ JSONが途中で切れていたため、${arr.length}件だけ取り込みました ${skipped}\n\n対処法:\n1. Geminiに「続きを${arr[arr.length - 1].no + 1}番から出力してください」と追加指示\n2. 出力JSONを貼り付けて再度「JSONを取り込んで次へ」を押す\n\n※ このバッチが完了したら、次のバッチに自動で進みます。`);
+    }
+    saveSession();
+    showManualStep();
+    renderResults();
+    $('resultsSection').classList.remove('hidden');
+  } catch (err) {
+    log(`手動JSON取り込みエラー: ${err.message}`, 'err');
+    alert('JSONを取り込めません: ' + err.message + '\n\n対処法:\n・JSONが ``` から始まり ``` で終わっているか確認\n・Geminiが「続きを出力します」と途中で止まっていないか確認\n・コピー時にすべての行を選択できているか確認');
+  }
+  });
+}
+$('finishManualNow').addEventListener('click', finishManualWorkflow);
+$('saveNowBtn').addEventListener('click', async () => {
+  const btn = $('saveNowBtn');
+  const orig = btn.textContent;
+  btn.textContent = '保存中...';
+  btn.disabled = true;
+  await saveSession();
+  btn.textContent = '✓ 保存しました';
+  setTimeout(() => {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }, 1500);
+  log(`💾 セッション保存: ${state.articles.length}件のデータを端末に保存しました`, 'ok');
+});
+
+function hasNoField() {
+  return state.schema.fields.some(f => f.key === 'no');
+}
+
+function ensureDefaultEnrichSetting() {
+  if (state.schema.enrichFields && state.schema.enrichFields.length > 0 && state.schema.enrichEnabled) {
+    $('enrichFM').checked = true;
+  }
+}
+
+function finishManualWorkflow() {
+  runValidation();
+  renderResults();
+  setStatus('完了');
+  $('manualStatus').textContent = '完了';
+  state.running = false;
+  const wasTest = state.manual?.testOnly;
+  updateStartBtn();
+  saveSession();
+  if (wasTest) {
+    log(`<strong>🧪 お試し抽出完了</strong> · ${state.articles.length}件抽出`, 'bold');
+    log(`下の結果テーブル/Excelで内容を確認してください。問題なければ「🔄 リセット」してから「抽出を開始（全ページ）」で全ページを処理できます`, 'info');
+    // Show a clear next-step banner
+    setTimeout(() => {
+      const ok = confirm(
+        `🧪 お試し抽出が完了しました（${state.articles.length}件）。\n\n` +
+        `下記を確認してください:\n` +
+        `・「抽出結果」テーブルで内容が正しいか\n` +
+        `・Excelをダウンロードして実際の出力形式を確認\n` +
+        `・地図JSON、見出し、内容詳細などの精度\n\n` +
+        `▼ 問題なければ:\n` +
+        `「OK」を押すと結果をクリアして全ページ抽出に進めます\n\n` +
+        `▼ 問題があれば:\n` +
+        `「キャンセル」で結果を保持。STEP 03のスキーマや指示文を調整してください。`
+      );
+      if (ok) {
+        state.articles = [];
+        state.manual = null;
+        $('manualSection').classList.add('hidden');
+        $('resultsSection').classList.add('hidden');
+        renderResults();
+        clearSession();
+        log(`▶ 全ページ抽出の準備完了。「抽出を開始（全ページ）」をタップしてください`, 'ok');
+      }
+    }, 300);
+  } else {
+    log(`<strong>手動相談モード完了</strong> · ${state.articles.length}件`, 'bold');
+  }
+}
+
+// =====================================================================
+// API extraction workflow
+// =====================================================================
+$('startBtn').addEventListener('click', () => {
+  if ($('runMode').value === 'manual') startManualWorkflow();
+  else runExtraction({ resume: false });
+});
+$('testRunBtn').addEventListener('click', async () => {
+  if (!state.pdfDoc) return;
+  const totalPages = state.pdfPageCount;
+  const ok = confirm(
+    `🧪 お試し抽出を開始します。\n\n` +
+    `▼ 動作:\n` +
+    `・PDFの1ページ目だけを抽出\n` +
+    `・F〜M列も生成（チェックON時のみ）\n` +
+    `・Excel/JSON/結果テーブルで出力を確認できます\n\n` +
+    `▼ 消費:\n` +
+    `・API: 約2回（抽出1 + 深掘り1）\n` +
+    `・手動相談モード: 同じく1ページ分のプロンプト1回\n\n` +
+    `結果に問題なければ「抽出を開始（全ページ）」で${totalPages}ページ全部を処理してください。\n\n` +
+    `開始しますか？`
+  );
+  if (!ok) return;
+
+  if ($('runMode').value === 'manual') {
+    startManualWorkflow({ testOnly: true });
+  } else {
+    runExtraction({ resume: false, testOnly: true });
+  }
+});
+$('resumeBtn').addEventListener('click', () => {
+  if ($('runMode').value === 'manual') {
+    // Manual workflow already has its own continuation; nothing to do here
+    return;
+  }
+  runExtraction({ resume: true });
+});
+$('stopBtn').addEventListener('click', () => {
+  state.stopRequested = true;
+  log('⏹ 停止リクエスト受付 — 現在のステップ完了後に停止します', 'warn');
+  $('stopBtn').textContent = '停止中...';
+  $('stopBtn').disabled = true;
+});
+
+async function runExtraction(opts = {}) {
+  const isResume = opts.resume && state.resume;
+  const testOnly = !!opts.testOnly;
+  ensureDefaultEnrichSetting();
+  state.running = true;
+  state.stopRequested = false;
+  state._pdfModeLogged = false;
+  state._imgModeLogged = false;
+  if (!isResume) {
+    state.articles = [];
+    state.resume = null;
+    logEl.innerHTML = '';
+  }
+  $('validationSection').classList.add('hidden');
+  $('resultsSection').classList.add('hidden');
+  $('resetBtn').classList.add('hidden');
+  $('resumeBtn').classList.add('hidden');
+  $('stopBtn').classList.remove('hidden');
+  $('stopBtn').textContent = '⏸ 停止';
+  $('stopBtn').disabled = false;
+  updateStartBtn();
+
+  // Test mode: process only 1 page, batchSize=1
+  const userBatchSize = testOnly ? 1 : Math.max(2, parseInt($('batchSize').value) || 10);
+  const maxRetry = parseInt($('maxRetry').value) || 4;
+  const enrich = state.schema.enrichFields && $('enrichFM').checked;
+  const strict = $('strictMode').checked;
+  const total = testOnly ? 1 : state.pdfPageCount;
+
+  if (testOnly) {
+    log(`<strong>🧪 お試し抽出開始</strong> · ${state.pdfFile.name} · 1ページのみ`, 'bold');
+    log(`結果に問題なければ「抽出を開始（全ページ）」で残り${state.pdfPageCount - 1}ページを処理してください`, 'info');
+  }
+
+  // Pre-flight warning if too many steps (skip for test mode)
+  const previewSteps = Math.ceil(total / userBatchSize);
+  const enrichSteps = enrich ? Math.ceil((previewSteps * 5) / 20) : 0;
+  const totalCalls = previewSteps + enrichSteps;
+  const model = $('model').value;
+  const freeRPD = /2\.5.*flash.*lite/i.test(model) ? 1000
+                : /2\.5.*flash/i.test(model) ? 250
+                : /2\.5.*pro/i.test(model) ? 100
+                : 250;
+
+  if (!isResume && !testOnly && totalCalls > freeRPD * 0.8) {
+    const remainingHint = totalCalls > freeRPD
+      ? `\n\n⚠ 無料枠1日${freeRPD}回を超えます (${totalCalls}回必要)。\n\n推奨:\n・バッチサイズを大きくする (現在${userBatchSize} → ${Math.ceil(userBatchSize * totalCalls / freeRPD)}以上)\n・または別モデル (gemini-2.5-flash-lite=1日1000回) に変更`
+      : `\n\n⚠ 無料枠の${Math.round(totalCalls / freeRPD * 100)}%を使用予定です。`;
+    const ok = confirm(`バッチサイズ${userBatchSize}で${previewSteps}ステップ + 深掘り${enrichSteps}ステップ = 計${totalCalls}回のAPI呼出が必要です。${remainingHint}\n\nこのまま実行しますか？`);
+    if (!ok) {
+      cleanupAfterRun();
+      return;
+    }
+  } else if (!isResume && !testOnly && previewSteps > 100) {
+    const intervalMs = getEffectiveCallIntervalMs();
+    const minutes = Math.ceil((previewSteps * (intervalMs / 1000 + 5)) / 60);
+    const ok = confirm(`バッチサイズ${userBatchSize}で${previewSteps}ステップ必要です。\n推定実行時間: 約${minutes}分。\nバッチサイズを大きくすると短縮できます。\nこのまま実行しますか？`);
+    if (!ok) {
+      cleanupAfterRun();
+      return;
+    }
+  }
+
+  // Build a queue of page ranges to process. This way we can dynamically split
+  // batches if truncation occurs, without breaking the resume index.
+  let queue;
+  if (isResume) {
+    queue = state.resume.queue ? state.resume.queue.slice() : [];
+    if (queue.length === 0) {
+      // Resume from index using userBatchSize
+      const startFrom = state.resume.nextIndex * userBatchSize + 1;
+      queue = pageRangesFrom(startFrom, total, userBatchSize);
+    }
+  } else {
+    queue = pageRangesFrom(1, total, userBatchSize);
+  }
+  const totalInitial = queue.length;
+
+  if (isResume) {
+    log(`<strong>続きから再開</strong> · 残${queue.length}バッチ`, 'bold');
+  } else {
+    log(`<strong>抽出開始</strong> · ${state.pdfFile.name} · ${total}ページ · バッチ${userBatchSize}p × ${queue.length}ステップ`, 'bold');
+    const intervalMs = getEffectiveCallIntervalMs();
+    if (intervalMs > 0) {
+      log(`呼出間隔: ${(intervalMs/1000).toFixed(1)}秒 (≒${Math.floor(60_000/intervalMs)} RPM) · 出力上限: ${/1\.5/.test($('model').value) ? 8192 : 65536} tok`, 'info');
+    }
+  }
+  setStatus(`<span class="spin"></span> 抽出中`);
+
+  const resumePhase = isResume ? state.resume.phase : 'extract';
+  const enrichStartIdx = (isResume && resumePhase === 'enrich') ? state.resume.nextIndex : 0;
+
+  try {
+    if (resumePhase === 'extract') {
+      const extractionSchema = buildExtractionJsonSchema();
+      let stepNum = 0;
+      while (queue.length > 0) {
+        if (state.stopRequested) {
+          state.resume = { phase: 'extract', nextIndex: 0, queue: queue.slice() };
+          throw new Error('STOPPED_BY_USER');
+        }
+
+        const { startPage, endPage } = queue.shift();
+        const startNo = state.articles.length + 1;
+        stepNum++;
+        const remaining = queue.length;
+        log(`<strong>Step ${stepNum}</strong> (残${remaining}): P${startPage}〜P${endPage} を抽出中...`, 'bold');
+
+        let batch = null;
+        let attempt = 0;
+        let lastErr = null;
+        let shouldSplitBatch = false;
+        while (attempt <= maxRetry) {
+          try {
+            const prompt = buildExtractionPrompt(startPage, endPage, startNo);
+            const pages = range(startPage, endPage);
+            batch = await callGemini(prompt, extractionSchema, { pages });
+            break;
+          } catch (err) {
+            lastErr = err;
+            // === Truncation: never retry, just split the batch ===
+            if (err.isTruncated) {
+              shouldSplitBatch = true;
+              break;
+            }
+            // === Stop signal ===
+            if (err.message === 'STOPPED_BY_USER') {
+              state.resume = { phase: 'extract', nextIndex: 0, queue: [{startPage, endPage}, ...queue] };
+              throw err;
+            }
+            // === Daily quota — won't recover in this session ===
+            if (err.isDailyQuota) {
+              state.resume = { phase: 'extract', nextIndex: 0, queue: [{startPage, endPage}, ...queue] };
+              throw new Error(
+                `Gemini無料枠の日次上限に到達しました。\n\n` +
+                `▼ 対処法（即時可能）:\n` +
+                `① STEP 01 のモデルを「gemini-2.5-flash-lite」に切り替えて「続きから再開」\n` +
+                `   (2.5-flash-liteは別枠で、無料枠 1日1000回)\n\n` +
+                `② または、明日（日本時間17時以降）に「続きから再開」\n\n` +
+                `③ または、Google Cloud Consoleで課金を有効化（22ページで約¥163）\n\n` +
+                `▼ 現状の抽出データは保存済み。「続きから再開」で続行可能です。`
+              );
+            }
+            attempt++;
+            if (attempt <= maxRetry) {
+              log(`  ⚠ 再試行 ${attempt}/${maxRetry}: ${shortErr(err.message)}`, 'warn');
+              await waitForRetry(err, 1000 * attempt, '  ', attempt);
+            }
+          }
+        }
+
+        // Handle truncation: split this batch and push back to queue front
+        if (shouldSplitBatch) {
+          if (startPage === endPage) {
+            // Can't split a single page — record what we have or fail
+            log(`  ✗ P${startPage}: 1ページでも出力が切れました。このページは記述が極めて密です。スキップします。`, 'err');
+            continue;
+          }
+          const mid = Math.floor((startPage + endPage) / 2);
+          log(`  ⚠ 出力切れを検出 — バッチを分割: P${startPage}-P${mid} と P${mid+1}-P${endPage}`, 'warn');
+          queue.unshift({startPage: mid + 1, endPage: endPage});
+          queue.unshift({startPage: startPage, endPage: mid});
+          continue;
+        }
+
+        if (!batch) {
+          state.resume = { phase: 'extract', nextIndex: 0, queue: [{startPage, endPage}, ...queue] };
+          throw new Error(`Step ${stepNum} 失敗: ${lastErr?.message}`);
+        }
+
+        // Auto-fix pages/sequence + check required fields (lenient mode)
+        const wasTruncated = batch._truncated;
+        delete batch._truncated;
+        const issues = validateBatch(batch, startNo, startPage, endPage);
+        if (issues.length > 0 && strict) {
+          log(`  ⚠ 検証警告: ${issues.slice(0,3).join(' / ')}`, 'warn');
+        }
+
+        state.articles.push(...batch);
+        log(`  ✓ ${batch.length}件抽出${hasNoField() ? ` (No.${startNo}〜${startNo + batch.length - 1})` : ''}${wasTruncated ? ' (一部のみ救出)' : ''}`, 'ok');
+        saveSession(); // Persist after every batch
+        clearPageImageCache(); // Free memory between batches for big PDFs
+
+        // If salvaged truncated batch, schedule remaining pages for re-extraction
+        if (wasTruncated && startPage < endPage) {
+          // Find the highest page actually covered, re-queue the rest
+          const pagesCovered = batch.map(a => a.page).filter(p => typeof p === 'number');
+          const maxCovered = pagesCovered.length ? Math.max(...pagesCovered) : startPage;
+          if (maxCovered < endPage) {
+            log(`  ⤴ P${maxCovered+1}-P${endPage} を後で再処理キューに追加`, 'info');
+            queue.unshift({startPage: maxCovered + 1, endPage: endPage});
+          }
+        }
+      }
+      log(`<strong>抽出フェーズ完了</strong>: 合計 ${state.articles.length}件`, 'bold');
+    }
+
+    if (enrich) {
+      const editionCode = detectEdition(state.pdfFile.name);
+      const enrichSchema = buildEnrichmentJsonSchema();
+      const enrichBatchSize = 20;
+      const enrichSteps = Math.ceil(state.articles.length / enrichBatchSize);
+      if (enrichStartIdx === 0) log(`<strong>深掘り分析フェーズ開始</strong>`, 'bold');
+      for (let i = enrichStartIdx; i < enrichSteps; i++) {
+        if (state.stopRequested) {
+          state.resume = { phase: 'enrich', nextIndex: i };
+          throw new Error('STOPPED_BY_USER');
+        }
+        const slice = state.articles.slice(i * enrichBatchSize, (i+1) * enrichBatchSize);
+        log(`  深掘り ${i+1}/${enrichSteps}: No.${slice[0].no}〜${slice[slice.length-1].no}`, 'info');
+        let enrichments = null;
+        let attempt = 0;
+        let lastErr = null;
+        while (attempt <= maxRetry) {
+          try {
+            const prompt = buildEnrichmentPrompt(slice, editionCode);
+            const pages = slice.map(a => a.page).filter(Boolean);
+            enrichments = await callGemini(prompt, enrichSchema, { pages });
+            break;
+          } catch (err) {
+            lastErr = err;
+            if (err.message === 'STOPPED_BY_USER') {
+              state.resume = { phase: 'enrich', nextIndex: i };
+              throw err;
+            }
+            if (err.isDailyQuota) {
+              state.resume = { phase: 'enrich', nextIndex: i };
+              throw new Error(
+                `Gemini無料枠の日次上限に到達しました（深掘り分析フェーズ）。\n\n` +
+                `▼ 対処法（即時可能）:\n` +
+                `① STEP 01 のモデルを「gemini-2.5-flash-lite」に切り替えて「続きから再開」\n` +
+                `   (2.5-flash-liteは別枠で、無料枠 1日1000回)\n` +
+                `② または、明日（日本時間17時以降）に「続きから再開」\n` +
+                `③ または、Google Cloud Consoleで課金を有効化\n\n` +
+                `▼ A〜E列の抽出データは保存済み。再開すれば続きから処理されます。`
+              );
+            }
+            attempt++;
+            if (attempt <= maxRetry) {
+              log(`    ⚠ 再試行 ${attempt}/${maxRetry}: ${shortErr(err.message)}`, 'warn');
+              await waitForRetry(err, 1000 * attempt, '    ', attempt);
+            }
+          }
+        }
+        if (!enrichments) {
+          state.resume = { phase: 'enrich', nextIndex: i };
+          throw new Error(`深掘り Step ${i+1} 失敗: ${lastErr?.message}`);
+        }
+        const map = new Map(enrichments.map(e => [e.no, e]));
+        slice.forEach(art => {
+          const e = map.get(art.no);
+          if (e) Object.assign(art, e);
+        });
+        log(`    ✓ ${enrichments.length}件分析完了`, 'ok');
+      }
+      log(`<strong>深掘り完了</strong>`, 'bold');
+    }
+
+    state.resume = null;
+    runValidation();
+    renderResults();
+    setStatus('完了');
+    if (testOnly) {
+      log(`<strong>🧪 お試し抽出完了</strong> · ${state.articles.length}件抽出`, 'bold');
+      log(`下の結果テーブル/Excelで内容を確認してください`, 'info');
+      setTimeout(() => {
+        const ok = confirm(
+          `🧪 お試し抽出が完了しました（${state.articles.length}件）。\n\n` +
+          `下記を確認してください:\n` +
+          `・「抽出結果」テーブルで内容が正しいか\n` +
+          `・Excelをダウンロードして実際の出力形式を確認\n\n` +
+          `▼ 問題なければ:\n` +
+          `「OK」を押すと結果をクリアして全ページ抽出に進めます\n\n` +
+          `▼ 問題があれば:\n` +
+          `「キャンセル」で結果を保持。STEP 03のスキーマや指示文を調整してください。`
+        );
+        if (ok) {
+          state.articles = [];
+          $('resultsSection').classList.add('hidden');
+          renderResults();
+          clearSession();
+          log(`▶ 全ページ抽出の準備完了。「抽出を開始（全ページ）」をタップしてください`, 'ok');
+        }
+      }, 300);
+    } else {
+      log(`<strong>全工程完了</strong> · ${state.articles.length}件抽出`, 'bold');
+    }
+  } catch (err) {
+    const stopped = err.message === 'STOPPED_BY_USER' || state.stopRequested;
+    if (stopped) {
+      log(`<strong>ユーザにより停止</strong>`, 'warn');
+      setStatus('停止 — 「続きから再開」で再開可能');
+    } else {
+      log(`<strong>エラー</strong>: ${err.message}`, 'err');
+      setStatus('エラー終了 — 「続きから再開」で再試行可能');
+    }
+    if (state.articles.length > 0) {
+      runValidation();
+      renderResults();
+      log(`現在までに ${state.articles.length}件 抽出済み。`, 'info');
+    }
+    if (state.resume) $('resumeBtn').classList.remove('hidden');
+  } finally {
+    cleanupAfterRun();
+  }
+}
+
+function cleanupAfterRun() {
+  state.running = false;
+  state.stopRequested = false;
+  $('stopBtn').classList.add('hidden');
+  $('resetBtn').classList.remove('hidden');
+  updateStartBtn();
+}
+
+// Build an array of {startPage, endPage} ranges
+function pageRangesFrom(startPage, total, batchSize) {
+  const arr = [];
+  let p = startPage;
+  while (p <= total) {
+    arr.push({ startPage: p, endPage: Math.min(p + batchSize - 1, total) });
+    p += batchSize;
+  }
+  return arr;
+}
+
+function shortErr(msg) {
+  if (!msg) return '';
+  const s = String(msg);
+  if (s.length <= 140) return escapeHtml(s);
+  // For 429s, summarize
+  const m = s.match(/(\d{3}):\s*\{[\s\S]*?"message":\s*"([^"]*)"/);
+  if (m) return `${m[1]}: ${escapeHtml(m[2].slice(0, 120))}…`;
+  return escapeHtml(s.slice(0, 140) + '…');
+}
+
+function sleep(ms) {
+  // Cancellable sleep — checks stopRequested every 500ms
+  return new Promise((resolve, reject) => {
+    const step = 500;
+    let elapsed = 0;
+    const tick = () => {
+      if (state.stopRequested) { reject(new Error('STOPPED_BY_USER')); return; }
+      if (elapsed >= ms) { resolve(); return; }
+      const next = Math.min(step, ms - elapsed);
+      elapsed += next;
+      setTimeout(tick, next);
+    };
+    tick();
+  });
+}
+function range(start, end) {
+  const arr = [];
+  for (let n = start; n <= end; n++) arr.push(n);
+  return arr;
+}
+function parseGeminiRetryMs(text) {
+  const s = String(text || '');
+  const retryInfo = s.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/);
+  if (retryInfo) return Math.ceil(parseFloat(retryInfo[1]) * 1000) + 800;
+  const msg = s.match(/Please retry in\s+([0-9.]+)s/i);
+  if (msg) return Math.ceil(parseFloat(msg[1]) * 1000) + 800;
+  const ms = s.match(/Please retry in\s+([0-9.]+)ms/i);
+  if (ms) return Math.ceil(parseFloat(ms[1])) + 800;
+  return 8000;
+}
+async function waitForRetry(err, fallbackMs, prefix='', attempt=1) {
+  // On 429: use server-provided retry-after, with progressive backoff for repeated failures
+  let ms;
+  if (err?.status === 429) {
+    ms = err.retryAfterMs || parseGeminiRetryMs(err.message);
+    // Add extra buffer on repeated 429s — the per-minute window may not have fully cleared
+    if (attempt >= 2) ms = Math.max(ms, 60_000); // wait full minute on 2nd+ retry
+    ms = Math.min(ms, 90_000); // cap at 90s
+  } else {
+    ms = Math.min(fallbackMs * attempt, 30_000); // exponential, capped at 30s for non-rate-limit errors
+  }
+  const sec = Math.max(1, Math.ceil(ms / 1000));
+  log(`${prefix}⏳ ${err?.status === 429 ? 'レート制限' : 'エラー'}のため ${sec}秒待機して再試行します`, 'warn');
+  await sleep(ms);
+}
+
+// === Effective throttle interval (ms) — accounts for free-tier-safe override ===
+function getEffectiveCallIntervalMs() {
+  const safe = $('freeTierSafe')?.checked;
+  if (safe) {
+    const model = $('model').value;
+    const rpm = PRICING[model]?.freeRpm || 10;
+    // Use 80% of the limit to leave headroom (e.g. 10 RPM → 6s with margin → 7.5s)
+    return Math.ceil((60_000 / rpm) * 1.2);
+  }
+  const manual = parseFloat($('callInterval').value) || 0;
+  return Math.max(0, manual * 1000);
+}
+
+// =====================================================================
+// Validation (schema-aware)
+// =====================================================================
+function pickKeywordTerm(article) {
+  const parts = [
+    article.headline,
+    article.quiz_a,
+    article.quiz_q,
+    article.content_detail,
+    article.key_insights,
+    article.intent_motive,
+  ].map(v => String(v || '')).filter(Boolean);
+  const text = parts.join(' ');
+
+  const quoted = [...text.matchAll(/[「『]([^」』]{2,35})[」』]/g)]
+    .map(m => m[1].trim())
+    .filter(s => !/^(する|した|発表|検討|報道|見通し|ポイント)$/.test(s));
+  if (quoted.length > 0) return quoted[0];
+
+  const acronym = text.match(/[（(]([A-Za-z][A-Za-z0-9&.\- ]{2,20})[）)]/);
+  if (acronym) return acronym[1].trim();
+
+  const nounish = text
+    .replace(/[、。,.]/g, ' ')
+    .split(/\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length >= 3 && s.length <= 24)
+    .filter(s => !/^(について|として|による|における|する|した|発表|検討|報道)$/.test(s));
+  if (nounish.length > 0) return nounish[0].replace(/^[「『]+|[」』]+$/g, '');
+
+  return article.category || article.genre || 'この記事の重要語';
+}
+
+function buildRepairSuggestion(article, key, label) {
+  const headline = String(article.headline || '').trim();
+  const category = String(article.category || article.genre || '').trim();
+  if (key === 'keyword') {
+    const term = pickKeywordTerm(article);
+    const context = headline
+      ? `${headline}を理解するうえで重要な用語。記事の背景や影響を読み解く手がかりとなる。`
+      : `${category || 'この記事'}を理解するうえで重要な用語。記事の背景や影響を読み解く手がかりとなる。`;
+    return `${term}: ${context}`;
+  }
+  if (key === 'page') return article.page ? String(article.page) : '';
+  if (/quiz_a|クイズ（解）|クイズ解/.test(`${key} ${label}`)) {
+    return headline ? `${headline}に関する記事内容を確認する。` : '';
+  }
+  if (/quiz_q|クイズ（問）|クイズ問/.test(`${key} ${label}`)) {
+    return headline ? `この記事の主要なポイントは何か。` : '';
+  }
+  return headline ? `${headline}に関する内容。` : `${category || label}に関する内容。`;
+}
+
+async function copyTextSafe(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+// Returns { issues: string[], fixed: array } — auto-corrects out-of-range pages
+// when only 1 page is in the batch (unambiguous fix). Returns issues only for
+// genuinely fatal problems (missing required fields, empty result).
+function validateBatch(batch, startNo, startPage, endPage, opts = {}) {
+  const issues = [];
+  if (!Array.isArray(batch) || batch.length === 0) {
+    issues.push('データが0件');
+    return issues;
+  }
+  const noField = state.schema.fields.find(f => f.key === 'no');
+  const pageField = state.schema.fields.find(f => f.key === 'page');
+  const singlePageBatch = (startPage === endPage);
+  const pageCount = endPage - startPage + 1;
+  const fieldsToValidate = opts.fieldsToValidate || state.schema.fields;
+  let pageFixCount = 0;
+
+  batch.forEach((a, i) => {
+    batch[i] = a = normalizeArticleRecord(a);
+    // Auto-fix page numbers
+    if (pageField) {
+      const p = a.page;
+      const outOfRange = (!p || p < 1 || p < startPage || p > endPage);
+      if (outOfRange) {
+        if (singlePageBatch) {
+          // Unambiguous: only one page in this batch — set to it
+          a.page = startPage;
+          pageFixCount++;
+        } else {
+          // Gemini often numbers pages relative to the split PDF. Convert
+          // relative page 1..N to original PDF page startPage..endPage.
+          if (typeof p === 'number' && p >= 1 && p <= pageCount && startPage > 1) {
+            a.page = startPage + p - 1;
+            pageFixCount++;
+          } else if (typeof p === 'number' && p > 0) {
+            if (p < startPage) a.page = startPage;
+            else if (p > endPage) a.page = endPage;
+            pageFixCount++;
+          } else {
+            // No usable page number — distribute evenly
+            const ratio = i / batch.length;
+            a.page = startPage + Math.floor(ratio * (endPage - startPage + 1));
+            pageFixCount++;
+          }
+        }
+      }
+    }
+    // Auto-fix no (sequence) — assign mechanically rather than failing
+    if (noField) {
+      a.no = startNo + i;
+    }
+    if ('edition' in a && !a.edition && state.pdfFile?.name) {
+      const editionCode = detectEdition(state.pdfFile.name);
+      if (editionCode !== '?') a.edition = editionCode;
+    }
+    // ONLY fail on missing required fields (which actually need re-extraction)
+    fieldsToValidate.filter(f => f.required && f.key !== 'no' && f.key !== 'page').forEach(f => {
+      if (a[f.key] === undefined || a[f.key] === null || a[f.key] === '') {
+        issues.push(`${i+1}番目: ${f.label}が空`);
+      }
+    });
+  });
+
+  if (pageFixCount > 0) {
+    log(`  ℹ ページ番号 ${pageFixCount}件を自動修正`, 'info');
+  }
+  return issues;
+}
+
+function runValidation() {
+  const arr = state.articles;
+  const checks = [];
+
+  const noField = state.schema.fields.find(f => f.key === 'no');
+  const pageField = state.schema.fields.find(f => f.key === 'page');
+  const isBlank = (v) => v === undefined || v === null || v === '';
+  const articleLabel = (a, idx) => {
+    const no = a.no || (idx + 1);
+    const page = a.page ? `P${a.page}` : 'P?';
+    const headline = String(a.headline || a.title || '').trim();
+    return `No.${no} / ${page}${headline ? ` / ${headline.slice(0, 60)}` : ''}`;
+  };
+  const missingRowsFor = (field) => arr
+    .map((a, idx) => ({ a, idx }))
+    .filter(({ a }) => isBlank(a[field.key]))
+    .map(({ a, idx }) => ({ idx, text: articleLabel(a, idx) }));
+
+  // Check 1: Sequence (if no field exists)
+  if (noField) {
+    let seqOk = true;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].no !== i + 1) { seqOk = false; break; }
+    }
+    checks.push({ label: 'No連番（欠番なし）', ok: seqOk });
+  }
+
+  // Check 2: All pages present (if page field exists)
+  if (pageField) {
+    const noPage = arr.filter(a => !a.page);
+    checks.push({
+      label: 'ページ番号 全件記載',
+      ok: noPage.length === 0,
+      detail: noPage.length > 0 ? `${noPage.length}件欠落` : null,
+      rows: arr
+        .map((a, idx) => ({ a, idx }))
+        .filter(({ a }) => !a.page)
+        .map(({ a, idx }) => ({ idx, text: articleLabel(a, idx), fieldKey: 'page', fieldLabel: 'ページ番号' })),
+    });
+
+    // Check 3: Page coverage
+    const pages = new Set(arr.map(a => a.page).filter(Boolean));
+    const expectedPages = state.pdfPageCount;
+    const coverage = pages.size / expectedPages;
+    checks.push({ label: `ページ網羅 (${pages.size}/${expectedPages})`, ok: coverage >= 0.7 });
+  }
+
+  // Check 4: Required fields
+  state.schema.fields.filter(f => f.required).forEach(f => {
+    const rows = missingRowsFor(f);
+    const missing = rows.length;
+    checks.push({ label: `${f.label} 全件記載`, ok: missing === 0, detail: missing > 0 ? `${missing}件欠落` : null, rows, fieldKey: f.key, fieldLabel: f.label });
+  });
+
+  // Check 5: Item density (only meaningful with page field)
+  if (pageField) {
+    const avgPerPage = arr.length / state.pdfPageCount;
+    const expectedDensity = state.schema.itemsPerPage * 0.4;
+    checks.push({ label: `データ密度 (平均${avgPerPage.toFixed(1)}件/頁)`, ok: avgPerPage >= expectedDensity });
+  }
+
+  // Check 6: Enrichment fields when requested
+  if (state.schema.enrichFields && state.schema.enrichFields.length > 0 && $('enrichFM').checked) {
+    state.schema.enrichFields.forEach(f => {
+      const rows = missingRowsFor(f);
+      const missing = rows.length;
+      checks.push({ label: `${f.label} 全件記載`, ok: missing === 0, detail: missing > 0 ? `${missing}件欠落` : null, rows, fieldKey: f.key, fieldLabel: f.label });
+    });
+  }
+
+  const allOk = checks.every(c => c.ok);
+  $('validationSection').classList.remove('hidden');
+  $('vBadge').textContent = allOk ? '合格' : '要確認';
+  $('vBadge').className = `v-badge ${allOk ? 'v-badge-ok' : 'v-badge-warn'}`;
+
+  $('vChecks').innerHTML = checks.map(c => `
+    <div class="v-check ${c.ok ? 'ok' : 'fail'}">
+      <span class="mark">${c.ok ? '✓' : '✗'}</span>
+      <span>${c.label}${c.detail ? ` · ${c.detail}` : ''}</span>
+    </div>
+  `).join('');
+
+  const failed = checks.filter(c => !c.ok);
+  if (failed.length > 0) {
+    const repairableRows = failed.flatMap(c => (c.rows || []).map(r => ({
+      idx: r.idx,
+      fieldKey: c.fieldKey || r.fieldKey || '',
+      fieldLabel: c.fieldLabel || r.fieldLabel || c.label.replace(/\s*全件記載$/, ''),
+      text: r.text || String(r),
+    }))).filter(r => r.fieldKey);
+    repairableRows.forEach(row => {
+      row.suggestion = buildRepairSuggestion(state.articles[row.idx] || {}, row.fieldKey, row.fieldLabel);
+    });
+    $('vIssues').classList.remove('hidden');
+    $('vIssues').innerHTML = `
+      <strong>要確認項目があります:</strong>
+      ${repairableRows.length ? `<div>
+        <button type="button" class="v-repair-all v-repair-auto" id="autoRepairMissingAll">候補で自動補正</button>
+        <button type="button" class="v-repair-all" id="repairMissingAll">欠落項目を順に手入力</button>
+      </div>` : ''}
+      <ul>${failed.map(c => {
+        const rowList = (c.rows || []).slice(0, 10);
+        const more = (c.rows || []).length > 10 ? `<li>...ほか${c.rows.length - 10}件</li>` : '';
+        return `<li>${c.label}${c.detail ? ` (${c.detail})` : ''}${rowList.length ? `<ul class="v-issue-details">${rowList.map(r => {
+          const fieldKey = c.fieldKey || r.fieldKey || '';
+          const fieldLabel = c.fieldLabel || r.fieldLabel || c.label.replace(/\s*全件記載$/, '');
+          const suggestion = fieldKey ? buildRepairSuggestion(state.articles[r.idx] || {}, fieldKey, fieldLabel) : '';
+          const repair = fieldKey ? `<button type="button" class="v-repair-btn" data-repair-field="${escapeHtml(fieldKey)}" data-repair-label="${escapeHtml(fieldLabel)}" data-repair-index="${r.idx}">手入力</button>` : '';
+          const auto = fieldKey && suggestion ? `<button type="button" class="v-repair-btn" data-auto-field="${escapeHtml(fieldKey)}" data-auto-label="${escapeHtml(fieldLabel)}" data-auto-index="${r.idx}">候補で補正</button>` : '';
+          const copy = fieldKey && suggestion ? `<button type="button" class="v-copy-btn" data-copy-suggestion="${escapeHtml(suggestion)}">候補をコピー</button>` : '';
+          const suggestionHtml = suggestion ? `<span class="v-suggestion">候補: ${escapeHtml(suggestion)}</span>` : '';
+          return `<li>${escapeHtml(r.text || r)}${suggestionHtml}${auto}${repair}${copy}</li>`;
+        }).join('')}${more}</ul>` : ''}</li>`;
+      }).join('')}</ul>
+    `;
+    const applyRepairValue = async (idx, key, label, value) => {
+      const target = state.articles[idx];
+      if (!target || !key) return false;
+      const trimmed = String(value || '').trim();
+      if (!trimmed) return false;
+      target[key] = key === 'page' ? (coerceInteger(trimmed) || trimmed) : trimmed;
+      await saveSession();
+      runValidation();
+      renderResults();
+      log(`✓ ${articleLabel(target, idx)} の「${label}」を候補で補正しました`, 'ok');
+      return true;
+    };
+    const repairOne = async (idx, key, label) => {
+      const target = state.articles[idx];
+      if (!target || !key) return false;
+      const suggestion = buildRepairSuggestion(target, key, label);
+      const current = target[key] === undefined || target[key] === null || target[key] === '' ? suggestion : String(target[key]);
+      const value = prompt(`${label}を入力してください\n${articleLabel(target, idx)}`, current);
+      if (value === null) return false;
+      const trimmed = value.trim();
+      if (!trimmed) {
+        alert('空欄のままでは補修できません。');
+        return false;
+      }
+      target[key] = key === 'page' ? (coerceInteger(trimmed) || trimmed) : trimmed;
+      await saveSession();
+      runValidation();
+      renderResults();
+      log(`✓ ${articleLabel(target, idx)} の「${label}」を手入力で補修しました`, 'ok');
+      return true;
+    };
+    const autoRepairAll = $('autoRepairMissingAll');
+    if (autoRepairAll) {
+      autoRepairAll.addEventListener('click', async () => {
+        const count = repairableRows.filter(r => r.suggestion).length;
+        if (count === 0) {
+          alert('自動補正できる候補がありません。');
+          return;
+        }
+        if (!confirm(`${count}件を候補文で自動補正します。よろしいですか？\n※ 出力前に内容は確認できます。`)) return;
+        for (const row of repairableRows) {
+          if (row.suggestion) {
+            const target = state.articles[row.idx];
+            if (target) target[row.fieldKey] = row.fieldKey === 'page' ? (coerceInteger(row.suggestion) || row.suggestion) : row.suggestion;
+          }
+        }
+        await saveSession();
+        runValidation();
+        renderResults();
+        log(`✓ 欠落項目 ${count}件を候補文で自動補正しました`, 'ok');
+      });
+    }
+    const repairAll = $('repairMissingAll');
+    if (repairAll) {
+      repairAll.addEventListener('click', async () => {
+        for (const row of repairableRows) {
+          const ok = await repairOne(row.idx, row.fieldKey, row.fieldLabel);
+          if (!ok) break;
+        }
+      });
+    }
+    $('vIssues').querySelectorAll('.v-repair-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const idx = parseInt(btn.dataset.repairIndex, 10);
+        const key = btn.dataset.repairField;
+        const label = btn.dataset.repairLabel || key;
+        await repairOne(idx, key, label);
+      });
+    });
+    $('vIssues').querySelectorAll('[data-auto-field]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const idx = parseInt(btn.dataset.autoIndex, 10);
+        const key = btn.dataset.autoField;
+        const label = btn.dataset.autoLabel || key;
+        const suggestion = buildRepairSuggestion(state.articles[idx] || {}, key, label);
+        await applyRepairValue(idx, key, label, suggestion);
+      });
+    });
+    $('vIssues').querySelectorAll('[data-copy-suggestion]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await copyTextSafe(btn.dataset.copySuggestion || '');
+        const old = btn.textContent;
+        btn.textContent = 'コピー済み';
+        setTimeout(() => { btn.textContent = old; }, 1200);
+      });
+    });
+  } else {
+    $('vIssues').classList.add('hidden');
+  }
+}
+
+// =====================================================================
+// Schema-aware result rendering & export
+// =====================================================================
+function getAllFields() {
+  const base = state.schema.fields.slice();
+  if (state.schema.enrichFields && state.schema.enrichFields.length > 0) {
+    const enrichRequested = $('enrichFM')?.checked || state.schema.enrichEnabled;
+    const hasEnrichData = state.articles.some(a =>
+      state.schema.enrichFields.some(f => a[f.key] !== undefined)
+    );
+    if (enrichRequested || hasEnrichData) return base.concat(state.schema.enrichFields);
+  }
+  return base;
+}
+
+function renderResults() {
+  $('resultsSection').classList.remove('hidden');
+  $('resultsCount').textContent = `${state.articles.length}件`;
+  const allFields = getAllFields();
+  const baseFields = state.schema.fields;
+  const enrichFields = allFields.length > baseFields.length ? allFields.slice(baseFields.length) : [];
+
+  // Decide which fields to show in main row (limit to ~5 for readability)
+  const mainFields = baseFields.slice(0, 6);
+  const detailFields = baseFields.slice(6).concat(enrichFields);
+
+  $('resultsHead').innerHTML = `<tr>${mainFields.map(f => {
+    let cls = '';
+    if (f.key === 'no') cls = 'col-no';
+    else if (f.key === 'page') cls = 'col-page';
+    return `<th class="${cls}">${escapeHtml(f.label)}</th>`;
+  }).join('')}</tr>`;
+
+  const body = $('resultsBody');
+  body.innerHTML = state.articles.map((a, idx) => {
+    const rowKey = a.no || (idx + 1);
+    const cellHtml = mainFields.map(f => {
+      let cls = '';
+      if (f.key === 'no') cls = 'col-no';
+      else if (f.key === 'page') cls = 'col-page';
+      const v = a[f.key];
+      const text = (v === undefined || v === null) ? '—' : String(v);
+      if (f.enumValues) {
+        return `<td class="${cls}"><span class="tag">${escapeHtml(text)}</span></td>`;
+      }
+      return `<td class="${cls}">${escapeHtml(text)}</td>`;
+    }).join('');
+
+    let mainCellWithToggle = cellHtml;
+    if (detailFields.length > 0) {
+      // Append toggle to last cell
+      mainCellWithToggle = cellHtml.replace(/<\/td>$/, `<div class="detail-toggle" data-key="${rowKey}">＋ 詳細を見る</div></td>`);
+    }
+
+    const detailRow = detailFields.length > 0 ? `
+      <tr class="detail-row" id="detail-${rowKey}">
+        <td colspan="${mainFields.length}">
+          <dl class="detail-grid">
+            ${detailFields.map(f => `<dt>${escapeHtml(f.label)}</dt><dd>${escapeHtml(String(a[f.key] ?? ''))}</dd>`).join('')}
+          </dl>
+        </td>
+      </tr>` : '';
+    return `<tr>${mainCellWithToggle}</tr>${detailRow}`;
+  }).join('');
+
+  body.querySelectorAll('.detail-toggle').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const k = e.target.dataset.key;
+      const dr = document.getElementById(`detail-${k}`);
+      if (dr) dr.classList.toggle('open');
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// =====================================================================
+// Export
+// =====================================================================
+function buildExportRows() {
+  const allFields = getAllFields();
+  return state.articles.map(a => normalizeArticleRecord(a)).map(a => {
+    const r = {};
+    allFields.forEach(f => {
+      let v = a[f.key];
+      if (v === undefined || v === null) v = '';
+      r[f.label] = v;
+    });
+    return r;
+  });
+}
+
+function describeArticleForIssue(a, idx) {
+  const no = a.no || (idx + 1);
+  const page = a.page ? `P${a.page}` : 'P?';
+  const headline = String(a.headline || a.title || '').trim();
+  return `No.${no} / ${page}${headline ? ` / ${headline.slice(0, 60)}` : ''}`;
+}
+
+function getMissingEnrichSummary() {
+  const enrichFields = state.schema.enrichFields || [];
+  if (enrichFields.length === 0 || !$('enrichFM')?.checked) return null;
+  const missing = enrichFields.map(f => ({
+    label: f.label,
+    count: state.articles.filter(a => a[f.key] === undefined || a[f.key] === null || a[f.key] === '').length,
+    examples: state.articles
+      .map((a, idx) => ({ a, idx }))
+      .filter(({ a }) => a[f.key] === undefined || a[f.key] === null || a[f.key] === '')
+      .slice(0, 5)
+      .map(({ a, idx }) => describeArticleForIssue(a, idx)),
+  })).filter(x => x.count > 0);
+  if (missing.length === 0) return null;
+  return {
+    missing,
+    allBlank: missing.every(x => x.count === state.articles.length),
+  };
+}
+
+function blockExportIfEnrichMissing(formatLabel) {
+  const summary = getMissingEnrichSummary();
+  if (!summary) return false;
+  const lines = summary.missing.slice(0, 8).map(x => {
+    const examples = x.examples.length > 0 ? `\n  ${x.examples.join('\n  ')}` : '';
+    return `・${x.label}: ${x.count}件欠落${examples}`;
+  }).join('\n');
+  alert(
+    `${formatLabel}出力を停止しました。\n\n` +
+    `F〜M列がまだ生成されていない、または一部欠落しています。\n` +
+    `${lines}${summary.missing.length > 8 ? `\n・ほか${summary.missing.length - 8}項目` : ''}\n\n` +
+    `対処:\n` +
+    `1. ページをリロード\n` +
+    `2. 「F〜M列（深掘り分析・クイズ・地図JSON・版種）も生成」がONか確認\n` +
+    `3. 復元データではなく、リセットして再抽出\n\n` +
+    `※ 古いA〜Eだけの抽出結果からF〜Mは自動復元できません。`
+  );
+  return true;
+}
+
+$('cleanupFileBtn').addEventListener('click', () => $('cleanupFileInput').click());
+$('cleanupFileInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    let rows;
+    const ext = f.name.toLowerCase().split('.').pop();
+    if (ext === 'json') {
+      const text = await f.text();
+      rows = JSON.parse(text);
+      if (!Array.isArray(rows)) throw new Error('JSONが配列ではありません');
+    } else if (ext === 'csv') {
+      const text = await f.text();
+      const lines = text.replace(/^\ufeff/, '').split(/\r?\n/).filter(Boolean);
+      if (lines.length < 2) throw new Error('CSVに行がありません');
+      const parseLine = (line) => {
+        const out = []; let cur = ''; let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i];
+          if (inQuote) {
+            if (c === '"' && line[i+1] === '"') { cur += '"'; i++; }
+            else if (c === '"') inQuote = false;
+            else cur += c;
+          } else {
+            if (c === ',') { out.push(cur); cur = ''; }
+            else if (c === '"') inQuote = true;
+            else cur += c;
+          }
+        }
+        out.push(cur);
+        return out;
+      };
+      const headers = parseLine(lines[0]);
+      rows = lines.slice(1).map(line => {
+        const vals = parseLine(line);
+        const o = {};
+        headers.forEach((h, i) => o[h] = vals[i] ?? '');
+        return o;
+      });
+    } else {
+      const ab = await f.arrayBuffer();
+      const wb = XLSX.read(ab);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    }
+
+    // Count cites
+    let citeCount = 0;
+    const countCites = (obj) => {
+      if (typeof obj === 'string') {
+        CITE_PATTERNS.forEach(re => {
+          const m = obj.match(re);
+          if (m) citeCount += m.length;
+        });
+      } else if (Array.isArray(obj)) obj.forEach(countCites);
+      else if (obj && typeof obj === 'object') Object.values(obj).forEach(countCites);
+    };
+    countCites(rows);
+
+    // Clean
+    const cleaned = rows.map(r => deepStripCites(r));
+
+    // Re-export same format
+    const base = f.name.replace(/\.[^.]+$/, '');
+    if (ext === 'json') {
+      const blob = new Blob([JSON.stringify(cleaned, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${base}_cleaned.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else if (ext === 'csv') {
+      const headers = Object.keys(cleaned[0] || {});
+      const escape = (v) => {
+        const s = String(v ?? '');
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const csv = '\ufeff' + [headers.join(','), ...cleaned.map(r => headers.map(h => escape(r[h])).join(','))].join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${base}_cleaned.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      const ws = XLSX.utils.json_to_sheet(cleaned);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '抽出結果');
+      XLSX.writeFile(wb, `${base}_cleaned.xlsx`);
+    }
+    alert(`✓ ${citeCount}箇所の[cite:]タグを除去し、${base}_cleaned.${ext} としてダウンロードしました。`);
+  } catch (err) {
+    alert('処理に失敗: ' + err.message);
+  } finally {
+    e.target.value = ''; // Reset so same file can be picked again
+  }
+});
+
+$('cleanCitesBtn').addEventListener('click', () => {
+  if (state.articles.length === 0) {
+    alert('結果データがありません');
+    return;
+  }
+  // Count cites before cleaning
+  let before = 0;
+  state.articles.forEach(a => {
+    for (const k in a) {
+      if (typeof a[k] === 'string') {
+        CITE_PATTERNS.forEach(re => {
+          const m = a[k].match(re);
+          if (m) before += m.length;
+        });
+      }
+    }
+  });
+  // Apply deep clean to in-memory data
+  state.articles = state.articles.map(a => deepStripCites(a));
+  renderResults();
+  if (before > 0) {
+    log(`[cite:]タグ ${before}箇所を除去しました`, 'ok');
+    alert(`✓ ${before}箇所の引用タグを除去しました。\n再度Excelエクスポートして保存してください。`);
+  } else {
+    alert('引用タグは見つかりませんでした。');
+  }
+});
+
+$('exportXlsx').addEventListener('click', () => {
+  if (blockExportIfEnrichMissing('Excel')) return;
+  const rows = buildExportRows();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '抽出結果');
+  const base = (state.pdfFile?.name || 'extract').replace(/\.pdf$/i, '');
+  XLSX.writeFile(wb, `${base}_extracted.xlsx`);
+});
+$('exportCsv').addEventListener('click', () => {
+  if (blockExportIfEnrichMissing('CSV')) return;
+  const rows = buildExportRows();
+  const headers = Object.keys(rows[0] || {});
+  const escape = (v) => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = '\ufeff' + [headers.join(','), ...rows.map(r => headers.map(h => escape(r[h])).join(','))].join('\r\n');
+  download(csv, 'text/csv', '.csv');
+});
+$('exportMd').addEventListener('click', () => {
+  if (blockExportIfEnrichMissing('Markdown')) return;
+  const rows = buildExportRows();
+  const headers = Object.keys(rows[0] || {});
+  const md = [
+    '| ' + headers.join(' | ') + ' |',
+    '|' + headers.map(() => '---').join('|') + '|',
+    ...rows.map(r => '| ' + headers.map(h => String(r[h] ?? '').replace(/\|/g, '\\|').replace(/\n/g, '<br>')).join(' | ') + ' |')
+  ].join('\n');
+  download(md, 'text/markdown', '.md');
+});
+$('exportJson').addEventListener('click', () => {
+  if (blockExportIfEnrichMissing('JSON')) return;
+  download(JSON.stringify(state.articles, null, 2), 'application/json', '.json');
+});
+
+function download(content, mime, ext) {
+  const base = (state.pdfFile?.name || 'extract').replace(/\.pdf$/i, '');
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${base}_extracted${ext}`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// =====================================================================
+// Init
+// =====================================================================
+(function init() {
+  const saved = loadSavedSchema();
+  if (saved && saved.preset && PRESETS[saved.preset]) {
+    const preset = PRESETS[saved.preset];
+    state.preset = saved.preset;
+    // Always use preset's enrichFields (avoid stale saved schemas missing F-M)
+    state.schema = {
+      fields: (saved.schema && saved.schema.fields) ? saved.schema.fields.map(f => ({...f})) : preset.fields.map(f => ({...f})),
+      enrichFields: preset.enrichFields ? preset.enrichFields.map(f => ({...f})) : null,
+      enrichEnabled: !!preset.enrichEnabled,
+      enrichLabel: preset.enrichLabel || '',
+      itemsPerPage: preset.itemsPerPage || ITEMS_PER_PAGE_DEFAULT,
+    };
+    $('rolePrompt').value = saved.role || preset.role;
+    $('extractionRules').value = saved.rules || preset.rules;
+    $('presetDesc').textContent = preset.description;
+    if (state.schema.enrichFields && state.schema.enrichFields.length > 0) {
+      $('enrichLabel').classList.remove('hidden');
+      $('enrichLabelText').textContent = preset.enrichLabel || '深掘り分析フィールドも生成';
+      $('enrichFM').checked = !!state.schema.enrichEnabled;
+    } else {
+      $('enrichLabel').classList.add('hidden');
+    }
+    renderPresetButtons();
+    renderSchemaTable();
+  } else {
+    applyPreset('nikkei');
+  }
+  updateCallIntervalUi();
+  updateCostEstimate();
+
+  // Restore session from IndexedDB (async)
+  loadSession().then(session => {
+    if (session && session.articles && session.articles.length > 0) {
+      showRestoreBanner(session);
+    }
+  });
+})();
+
+function showRestoreBanner(session) {
+  const elapsed = Date.now() - (session.savedAt || 0);
+  const elapsedStr = elapsed < 60_000 ? `${Math.round(elapsed/1000)}秒前`
+                  : elapsed < 3600_000 ? `${Math.round(elapsed/60_000)}分前`
+                  : elapsed < 86400_000 ? `${Math.round(elapsed/3600_000)}時間前`
+                  : `${Math.round(elapsed/86400_000)}日前`;
+  const banner = document.createElement('div');
+  banner.id = 'restoreBanner';
+  banner.style.cssText = `
+    position: sticky; top: 0; z-index: 100;
+    background: linear-gradient(135deg, #fdfaf1 0%, #fff 100%);
+    border: 2px solid #b8242a; border-left-width: 6px;
+    padding: 14px 18px; margin: -20px 0 24px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  `;
+  const pdfName = session.pdfName || '前回のファイル';
+  banner.innerHTML = `
+    <div style="flex: 1; min-width: 240px;">
+      <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 14px; font-weight: 700; color: #14110d; margin-bottom: 4px;">
+        💾 前回の作業データが見つかりました
+      </div>
+      <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 12px; color: #2a251e; line-height: 1.6;">
+        ${escapeHtml(pdfName)} · <strong>${session.articles.length}件</strong>抽出済み · ${elapsedStr}<br>
+        <span style="color: #6b6359; font-size: 11px;">※ PDFファイル本体は再選択が必要ですが、抽出データはそのまま使えます</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button class="btn btn-primary btn-sm" id="restoreYes">続きから再開</button>
+      <button class="btn btn-secondary btn-sm" id="restoreNo">破棄して新規開始</button>
+    </div>
+  `;
+  document.querySelector('.container').insertBefore(banner, document.querySelector('header').nextSibling);
+
+  $('restoreYes').addEventListener('click', () => {
+    state.articles = session.articles || [];
+    if (session.pdfName) {
+      state.pdfFile = { name: session.pdfName };
+      state.pdfPageCount = session.pdfPageCount || 0;
+    }
+    if (session.manualPhase) {
+      state.manual = {
+        phase: session.manualPhase,
+        index: session.manualIndex || 0,
+        batchSize: session.manualBatchSize || 10,
+        enrich: true,
+        enrichBatchSize: 20,
+      };
+    }
+    runValidation();
+    renderResults();
+    $('resultsSection').classList.remove('hidden');
+    $('resetBtn').classList.remove('hidden');
+    banner.remove();
+    log(`<strong>セッション復元</strong>: ${state.articles.length}件のデータを復元しました`, 'bold');
+    if (!$('validationSection').classList.contains('hidden')) {
+      $('validationSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (!state.pdfDoc) {
+      log(`⚠ PDFファイル本体は再アップロードが必要です（続きの抽出には必要、エクスポートは可能）`, 'warn');
+    }
+  });
+
+  $('restoreNo').addEventListener('click', () => {
+    if (confirm('保存された作業データを破棄します。よろしいですか？\n（この操作は取り消せません）')) {
+      clearSession();
+      banner.remove();
+    }
+  });
+}
+</script>
+</body>
+</html>
