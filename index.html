@@ -491,14 +491,10 @@ section { margin-bottom: 28px; }
 .v-issues ul { margin-left: 18px; margin-top: 6px; }
 .v-issue-details { margin: 6px 0 0 18px; color: var(--ink-soft); line-height: 1.7; }
 .v-issue-details li { margin: 2px 0; }
-.v-repair-all { display: inline-block; margin: 8px 8px 4px 0; padding: 7px 12px; border: 1px solid var(--red); background: var(--red); color: white; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
+.v-repair-all { display: inline-block; margin: 8px 0 4px; padding: 7px 12px; border: 1px solid var(--red); background: var(--red); color: white; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
 .v-repair-all:hover { filter: brightness(0.95); }
-.v-repair-auto { background: var(--ok); border-color: var(--ok); }
 .v-repair-btn { margin-left: 8px; padding: 2px 6px; border: 1px solid var(--line); background: white; color: var(--red); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; }
 .v-repair-btn:hover { background: #fdfaf1; }
-.v-copy-btn { margin-left: 6px; padding: 2px 6px; border: 1px solid var(--line); background: white; color: var(--ink-soft); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; }
-.v-copy-btn:hover { background: #fdfaf1; }
-.v-suggestion { display: block; margin: 3px 0 4px 0; color: var(--gray); font-size: 11px; line-height: 1.5; }
 
 /* ============ Results ============ */
 .results-panel { background: white; border: 1px solid var(--line); }
@@ -531,6 +527,14 @@ table.results tr:hover td { background: #fdfaf1; }
 .detail-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; font-size: 12px; line-height: 1.7; }
 .detail-grid dt { font-weight: 700; color: var(--ink-soft); font-size: 11px; letter-spacing: 0.05em; }
 .detail-grid dd { color: var(--ink-soft); white-space: pre-wrap; }
+.map-update-panel { background: white; border: 1px solid var(--line); padding: 18px 20px; margin-top: 16px; font-family: 'Noto Sans JP', sans-serif; }
+.map-update-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.map-update-title { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
+.map-update-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.map-update-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+@media (max-width: 760px) { .map-update-grid { grid-template-columns: 1fr; } }
+.map-update-note { color: var(--gray); font-size: 11px; line-height: 1.7; }
+.map-update-log { background: #fdfaf1; border: 1px solid var(--line-soft); padding: 10px 12px; max-height: 120px; overflow: auto; font-family: 'JetBrains Mono', 'Noto Sans JP', monospace; font-size: 11px; line-height: 1.6; color: var(--ink-soft); }
 
 /* ============ Misc ============ */
 .empty { text-align: center; padding: 60px 20px; font-family: 'Noto Sans JP', sans-serif; color: var(--gray); font-size: 13px; }
@@ -907,6 +911,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <button class="btn btn-secondary btn-sm" id="exportCsv">CSV</button>
         <button class="btn btn-secondary btn-sm" id="exportMd">Markdown</button>
         <button class="btn btn-secondary btn-sm" id="exportJson">JSON</button>
+        <button class="btn btn-secondary btn-sm" id="exportMapJson">Map data.json</button>
       </div>
     </div>
     <div class="results-body">
@@ -914,6 +919,44 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <thead id="resultsHead"></thead>
         <tbody id="resultsBody"></tbody>
       </table>
+    </div>
+    <div class="map-update-panel">
+      <div class="map-update-head">
+        <span class="map-update-title">日経マップ data.json 更新</span>
+        <div class="map-update-actions">
+          <button class="btn btn-secondary btn-sm" id="loadMapJsonBtn">既存data.json読み込み</button>
+          <button class="btn btn-secondary btn-sm" id="mergeCurrentMapBtn">抽出結果を追加/差し替え</button>
+          <button class="btn btn-secondary btn-sm" id="downloadMapJsonBtn" disabled>data.json保存</button>
+        </div>
+      </div>
+      <div class="map-update-grid">
+        <div class="field">
+          <label>日付</label>
+          <input type="date" id="mapDateInput">
+        </div>
+        <div class="field">
+          <label>版区分</label>
+          <select id="mapEditionSelect">
+            <option value="morning">朝刊</option>
+            <option value="evening">夕刊</option>
+            <option value="regional">地方版</option>
+            <option value="plusone">プラスワン</option>
+            <option value="weekly">週刊</option>
+            <option value="saturday">土曜版</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>削除対象日付</label>
+          <input type="text" id="mapDeleteDateInput" placeholder="例: 6/15">
+        </div>
+      </div>
+      <div class="map-update-actions" style="margin-bottom:10px;">
+        <button class="btn btn-secondary btn-sm" id="deleteMapDateBtn">指定日付を削除</button>
+      </div>
+      <div class="map-update-note">
+        抽出結果を日経マップ用data.json形式へ変換します。既存data.jsonを読み込むと、同じ日付・版は差し替えて保存できます。
+      </div>
+      <div class="map-update-log" id="mapUpdateLog">未読み込み</div>
     </div>
   </div>
 </section>
@@ -950,6 +993,19 @@ const TOKENS_PER_LONG_FIELD = 350;    // ~250 chars × 1.4
 const TOKENS_PER_SHORT_FIELD = 80;    // ~50 chars × 1.4
 const ITEMS_PER_PAGE_DEFAULT = 4;     // Rough density assumption
 
+const ONE_LINE_LEAD_INSTRUCTION = [
+  '【F〜H列の冒頭ルール】',
+  '内容・詳細、思惑と狙い/本音、理解すべき内容の3項目は、必ず各本文の冒頭に「一言でいうと、〇〇。」を入れる。',
+  '〇〇は記事の核心を20〜35字程度で要約する。冒頭の一文の後に、通常の詳しい説明・分析を続ける。',
+  '例: 一言でいうと、家計負担の増加が消費を冷やす局面です。...',
+].join('\n');
+
+function ensureOneLineLeadInstruction(rules) {
+  const base = String(rules || '').trim();
+  if (base.includes('【F〜H列の冒頭ルール】') || base.includes('一言でいうと、')) return base;
+  return `${base}${base ? '\n' : ''}${ONE_LINE_LEAD_INSTRUCTION}`;
+}
+
 // =====================================================================
 // SCHEMA PRESETS
 // =====================================================================
@@ -972,6 +1028,7 @@ const PRESETS = {
       '副題がある場合は headline に「主見出し　副見出し」のように併記',
       '1面上部・左部のカラム記事（他ページに本記事があるもの）は抽出しない',
       '数学記号（∑、√、∞、∫、≠、≒、≤、≥）は使用禁止。日本語で表現',
+      ONE_LINE_LEAD_INSTRUCTION,
       '全件出すこと。一括で出せないなら分割で出すこと',
     ].join('\n'),
     enrichEnabled: true,
@@ -984,9 +1041,9 @@ const PRESETS = {
       { key: 'headline', label: '見出し',      type: 'string',  required: true, desc: '【E列】記事のメインタイトル（副題があれば「主見出し　副見出し」のように併記）' },
     ],
     enrichFields: [
-      { key: 'content_detail', label: '内容・詳細',    type: 'string', long: true,  desc: '【F列】300字程度。背景・具体的な数値・今後の見通し・裏の意図を盛り込み、単なる要約でなく「読み物」として成立させる' },
-      { key: 'intent_motive',  label: '思惑と狙い/本音', type: 'string', long: true, desc: '【G列】政府・国家・企業・投資家などの関係者が持つ「真の意図」「報じられていない本音」を専門的に深掘り分析' },
-      { key: 'key_insights',   label: '理解すべき内容',type: 'string', long: true,  desc: '【H列】ビジネスパーソンや投資家が、その記事をなぜ重要視すべきか、社会に与えるインパクト' },
+      { key: 'content_detail', label: '内容・詳細',    type: 'string', long: true,  desc: '【F列】必ず冒頭を「一言でいうと、〇〇。」で始める。300字程度。背景・具体的な数値・今後の見通し・裏の意図を盛り込み、単なる要約でなく「読み物」として成立させる' },
+      { key: 'intent_motive',  label: '思惑と狙い/本音', type: 'string', long: true, desc: '【G列】必ず冒頭を「一言でいうと、〇〇。」で始める。政府・国家・企業・投資家などの関係者が持つ「真の意図」「報じられていない本音」を専門的に深掘り分析' },
+      { key: 'key_insights',   label: '理解すべき内容',type: 'string', long: true,  desc: '【H列】必ず冒頭を「一言でいうと、〇〇。」で始める。ビジネスパーソンや投資家が、その記事をなぜ重要視すべきか、社会に与えるインパクト' },
       { key: 'quiz_q',         label: 'クイズ（問）',  type: 'string', long: false, desc: '【I列】記事の重要ポイントから理解度を測る問い' },
       { key: 'quiz_a',         label: 'クイズ（解）',  type: 'string', long: false, desc: '【J列】クイズの正解' },
       { key: 'keyword',        label: 'キーワード解説',type: 'string', long: false, desc: '【K列】正解や記事内容に関連する専門用語を1つ選び解説' },
@@ -1249,7 +1306,7 @@ function applyPreset(presetId) {
     itemsPerPage: p.itemsPerPage || ITEMS_PER_PAGE_DEFAULT,
   };
   $('rolePrompt').value = p.role;
-  $('extractionRules').value = p.rules;
+  $('extractionRules').value = ensureOneLineLeadInstruction(p.rules);
   $('presetDesc').textContent = p.description;
 
   // Enrich checkbox visibility
@@ -2468,7 +2525,7 @@ function buildSchemaExample(fields, startNo) {
 
 function buildExtractionPrompt(startPage, endPage, startNo) {
   const role = $('rolePrompt').value.trim();
-  const rules = $('extractionRules').value.trim();
+  const rules = ensureOneLineLeadInstruction($('extractionRules').value);
   const pageList = [];
   for (let p = startPage; p <= endPage; p++) pageList.push(p);
   const pageCount = endPage - startPage + 1;
@@ -2516,6 +2573,8 @@ ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 【抽出ルール】
 ${rules}
 
+${ONE_LINE_LEAD_INSTRUCTION}
+
 【禁止事項（再掲・厳守）】
 - 「[cite: 24, 63]」「[cite_start]」「[24, 63]」のような引用タグは絶対に出力しないこと
 - 数学記号（∑、√、∞、∫、≠、≒、≤、≥）は使用禁止。日本語で表現すること`;
@@ -2548,6 +2607,8 @@ ${buildSchemaDescription(state.schema.enrichFields)}
 
 【トーン＆マナー】
 専門的で読者層に適した知的な表現。事実の羅列でなく洞察に満ちた分析を行うこと。
+
+${ONE_LINE_LEAD_INSTRUCTION}
 
 ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 - 地図・住所・場所フィールドは原則として必ず記入してください。空文字は最終手段。
@@ -2617,7 +2678,7 @@ function makeManualPrompt(kind, payload) {
 
   if (kind === 'extract') {
     const role = $('rolePrompt').value.trim();
-    const rules = $('extractionRules').value.trim();
+    const rules = ensureOneLineLeadInstruction($('extractionRules').value);
     const example = buildSchemaExample(allFields, payload.startNo);
     const pageCount = payload.endPage - payload.startPage + 1;
     const enrichNote = includeEnrich
@@ -2650,6 +2711,8 @@ ${buildSchemaDescription(allFields)}
 【抽出ルール】
 ${rules}${locationGuide}
 
+${ONE_LINE_LEAD_INSTRUCTION}
+
 【出力例（1件分の例）】
 ${example}
 
@@ -2675,6 +2738,8 @@ ${JSON.stringify(payload.articles, null, 2)}
 
 【生成項目】
 ${buildSchemaDescription(state.schema.enrichFields)}${locationGuide}
+
+${ONE_LINE_LEAD_INSTRUCTION}
 
 注意:
 - 入力データの no を必ず保持
@@ -2758,6 +2823,7 @@ function renderBatchGrid() {
           </span>
         </div>
         <div class="batch-tile-actions">
+          <button class="btn btn-primary btn-sm batch-gemini-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>🚀 Geminiで開く</button>
           <button class="btn btn-secondary btn-sm batch-pdf-btn" data-batch-id="${b.id}" ${pdfBtnDisabled}>📎 PDFダウンロード</button>
           <button class="btn btn-secondary btn-sm batch-prompt-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>📋 指示文コピー</button>
           ${b.status === 'done' || b.status === 'error' ? `<button class="btn btn-secondary btn-sm batch-clear-btn" data-batch-id="${b.id}">✕ クリア</button>` : ''}
@@ -2774,6 +2840,9 @@ function renderBatchGrid() {
   }).join('');
 
   // Bind events
+  grid.querySelectorAll('.batch-gemini-btn').forEach(btn => {
+    btn.addEventListener('click', () => openGeminiForBatch(parseInt(btn.dataset.batchId)));
+  });
   grid.querySelectorAll('.batch-pdf-btn').forEach(btn => {
     btn.addEventListener('click', () => downloadBatchPdf(parseInt(btn.dataset.batchId)));
   });
@@ -2835,6 +2904,34 @@ $('bulkPrepBtn').addEventListener('click', async () => {
     $('bulkPrepBtn').textContent = '📦 全バッチを一括準備';
   }
 });
+
+async function openGeminiForBatch(batchId) {
+  const m = state.manual;
+  const b = m?.batches[batchId];
+  if (!b) return;
+
+  // Open immediately while still inside the click gesture. Browsers may block
+  // window.open after awaits.
+  const geminiTab = window.open('about:blank', '_blank');
+
+  try {
+    await copyBatchPrompt(batchId);
+    await downloadBatchPdf(batchId);
+    if (geminiTab) {
+      geminiTab.location.href = 'https://gemini.google.com/app';
+    } else {
+      window.open('https://gemini.google.com/app', '_blank');
+    }
+    b.status = b.status === 'done' ? 'done' : 'editing';
+    b.summary = `Geminiタブを開きました。ダウンロードした P${b.startPage}〜P${b.endPage} PDF を添付し、コピー済みの指示文を貼り付けてください。`;
+    renderBatchGrid();
+    log(`🚀 バッチ${batchId+1}: PDFダウンロード + 指示文コピー + Gemini起動`, 'ok');
+  } catch (err) {
+    if (geminiTab) geminiTab.close();
+    log(`Gemini起動準備エラー (バッチ${batchId+1}): ${err.message}`, 'err');
+    alert('Gemini起動準備に失敗: ' + err.message);
+  }
+}
 
 async function downloadBatchPdf(batchId) {
   const m = state.manual;
@@ -3763,69 +3860,6 @@ function getEffectiveCallIntervalMs() {
 // =====================================================================
 // Validation (schema-aware)
 // =====================================================================
-function pickKeywordTerm(article) {
-  const parts = [
-    article.headline,
-    article.quiz_a,
-    article.quiz_q,
-    article.content_detail,
-    article.key_insights,
-    article.intent_motive,
-  ].map(v => String(v || '')).filter(Boolean);
-  const text = parts.join(' ');
-
-  const quoted = [...text.matchAll(/[「『]([^」』]{2,35})[」』]/g)]
-    .map(m => m[1].trim())
-    .filter(s => !/^(する|した|発表|検討|報道|見通し|ポイント)$/.test(s));
-  if (quoted.length > 0) return quoted[0];
-
-  const acronym = text.match(/[（(]([A-Za-z][A-Za-z0-9&.\- ]{2,20})[）)]/);
-  if (acronym) return acronym[1].trim();
-
-  const nounish = text
-    .replace(/[、。,.]/g, ' ')
-    .split(/\s+/)
-    .map(s => s.trim())
-    .filter(s => s.length >= 3 && s.length <= 24)
-    .filter(s => !/^(について|として|による|における|する|した|発表|検討|報道)$/.test(s));
-  if (nounish.length > 0) return nounish[0].replace(/^[「『]+|[」』]+$/g, '');
-
-  return article.category || article.genre || 'この記事の重要語';
-}
-
-function buildRepairSuggestion(article, key, label) {
-  const headline = String(article.headline || '').trim();
-  const category = String(article.category || article.genre || '').trim();
-  if (key === 'keyword') {
-    const term = pickKeywordTerm(article);
-    const context = headline
-      ? `${headline}を理解するうえで重要な用語。記事の背景や影響を読み解く手がかりとなる。`
-      : `${category || 'この記事'}を理解するうえで重要な用語。記事の背景や影響を読み解く手がかりとなる。`;
-    return `${term}: ${context}`;
-  }
-  if (key === 'page') return article.page ? String(article.page) : '';
-  if (/quiz_a|クイズ（解）|クイズ解/.test(`${key} ${label}`)) {
-    return headline ? `${headline}に関する記事内容を確認する。` : '';
-  }
-  if (/quiz_q|クイズ（問）|クイズ問/.test(`${key} ${label}`)) {
-    return headline ? `この記事の主要なポイントは何か。` : '';
-  }
-  return headline ? `${headline}に関する内容。` : `${category || label}に関する内容。`;
-}
-
-async function copyTextSafe(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-  }
-}
-
 // Returns { issues: string[], fixed: array } — auto-corrects out-of-range pages
 // when only 1 page is in the batch (unambiguous fix). Returns issues only for
 // genuinely fatal problems (missing required fields, empty result).
@@ -3984,48 +4018,25 @@ function runValidation() {
       fieldLabel: c.fieldLabel || r.fieldLabel || c.label.replace(/\s*全件記載$/, ''),
       text: r.text || String(r),
     }))).filter(r => r.fieldKey);
-    repairableRows.forEach(row => {
-      row.suggestion = buildRepairSuggestion(state.articles[row.idx] || {}, row.fieldKey, row.fieldLabel);
-    });
     $('vIssues').classList.remove('hidden');
     $('vIssues').innerHTML = `
       <strong>要確認項目があります:</strong>
-      ${repairableRows.length ? `<div>
-        <button type="button" class="v-repair-all v-repair-auto" id="autoRepairMissingAll">候補で自動補正</button>
-        <button type="button" class="v-repair-all" id="repairMissingAll">欠落項目を順に手入力</button>
-      </div>` : ''}
+      ${repairableRows.length ? `<div><button type="button" class="v-repair-all" id="repairMissingAll">欠落項目を順に補修</button></div>` : ''}
       <ul>${failed.map(c => {
         const rowList = (c.rows || []).slice(0, 10);
         const more = (c.rows || []).length > 10 ? `<li>...ほか${c.rows.length - 10}件</li>` : '';
         return `<li>${c.label}${c.detail ? ` (${c.detail})` : ''}${rowList.length ? `<ul class="v-issue-details">${rowList.map(r => {
           const fieldKey = c.fieldKey || r.fieldKey || '';
           const fieldLabel = c.fieldLabel || r.fieldLabel || c.label.replace(/\s*全件記載$/, '');
-          const suggestion = fieldKey ? buildRepairSuggestion(state.articles[r.idx] || {}, fieldKey, fieldLabel) : '';
-          const repair = fieldKey ? `<button type="button" class="v-repair-btn" data-repair-field="${escapeHtml(fieldKey)}" data-repair-label="${escapeHtml(fieldLabel)}" data-repair-index="${r.idx}">手入力</button>` : '';
-          const auto = fieldKey && suggestion ? `<button type="button" class="v-repair-btn" data-auto-field="${escapeHtml(fieldKey)}" data-auto-label="${escapeHtml(fieldLabel)}" data-auto-index="${r.idx}">候補で補正</button>` : '';
-          const copy = fieldKey && suggestion ? `<button type="button" class="v-copy-btn" data-copy-suggestion="${escapeHtml(suggestion)}">候補をコピー</button>` : '';
-          const suggestionHtml = suggestion ? `<span class="v-suggestion">候補: ${escapeHtml(suggestion)}</span>` : '';
-          return `<li>${escapeHtml(r.text || r)}${suggestionHtml}${auto}${repair}${copy}</li>`;
+          const repair = fieldKey ? `<button type="button" class="v-repair-btn" data-repair-field="${escapeHtml(fieldKey)}" data-repair-label="${escapeHtml(fieldLabel)}" data-repair-index="${r.idx}">手入力で補修</button>` : '';
+          return `<li>${escapeHtml(r.text || r)}${repair}</li>`;
         }).join('')}${more}</ul>` : ''}</li>`;
       }).join('')}</ul>
     `;
-    const applyRepairValue = async (idx, key, label, value) => {
-      const target = state.articles[idx];
-      if (!target || !key) return false;
-      const trimmed = String(value || '').trim();
-      if (!trimmed) return false;
-      target[key] = key === 'page' ? (coerceInteger(trimmed) || trimmed) : trimmed;
-      await saveSession();
-      runValidation();
-      renderResults();
-      log(`✓ ${articleLabel(target, idx)} の「${label}」を候補で補正しました`, 'ok');
-      return true;
-    };
     const repairOne = async (idx, key, label) => {
       const target = state.articles[idx];
       if (!target || !key) return false;
-      const suggestion = buildRepairSuggestion(target, key, label);
-      const current = target[key] === undefined || target[key] === null || target[key] === '' ? suggestion : String(target[key]);
+      const current = target[key] === undefined || target[key] === null ? '' : String(target[key]);
       const value = prompt(`${label}を入力してください\n${articleLabel(target, idx)}`, current);
       if (value === null) return false;
       const trimmed = value.trim();
@@ -4040,27 +4051,6 @@ function runValidation() {
       log(`✓ ${articleLabel(target, idx)} の「${label}」を手入力で補修しました`, 'ok');
       return true;
     };
-    const autoRepairAll = $('autoRepairMissingAll');
-    if (autoRepairAll) {
-      autoRepairAll.addEventListener('click', async () => {
-        const count = repairableRows.filter(r => r.suggestion).length;
-        if (count === 0) {
-          alert('自動補正できる候補がありません。');
-          return;
-        }
-        if (!confirm(`${count}件を候補文で自動補正します。よろしいですか？\n※ 出力前に内容は確認できます。`)) return;
-        for (const row of repairableRows) {
-          if (row.suggestion) {
-            const target = state.articles[row.idx];
-            if (target) target[row.fieldKey] = row.fieldKey === 'page' ? (coerceInteger(row.suggestion) || row.suggestion) : row.suggestion;
-          }
-        }
-        await saveSession();
-        runValidation();
-        renderResults();
-        log(`✓ 欠落項目 ${count}件を候補文で自動補正しました`, 'ok');
-      });
-    }
     const repairAll = $('repairMissingAll');
     if (repairAll) {
       repairAll.addEventListener('click', async () => {
@@ -4076,23 +4066,6 @@ function runValidation() {
         const key = btn.dataset.repairField;
         const label = btn.dataset.repairLabel || key;
         await repairOne(idx, key, label);
-      });
-    });
-    $('vIssues').querySelectorAll('[data-auto-field]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const idx = parseInt(btn.dataset.autoIndex, 10);
-        const key = btn.dataset.autoField;
-        const label = btn.dataset.autoLabel || key;
-        const suggestion = buildRepairSuggestion(state.articles[idx] || {}, key, label);
-        await applyRepairValue(idx, key, label, suggestion);
-      });
-    });
-    $('vIssues').querySelectorAll('[data-copy-suggestion]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        await copyTextSafe(btn.dataset.copySuggestion || '');
-        const old = btn.textContent;
-        btn.textContent = 'コピー済み';
-        setTimeout(() => { btn.textContent = old; }, 1200);
       });
     });
   } else {
@@ -4402,6 +4375,176 @@ $('exportJson').addEventListener('click', () => {
   download(JSON.stringify(state.articles, null, 2), 'application/json', '.json');
 });
 
+// =====================================================================
+// Nikkei map data.json updater (merged from nikkei-updater)
+// =====================================================================
+let mapArticles = [];
+
+const MAP_ED_LABEL = {
+  morning: '朝刊',
+  evening: '夕刊',
+  regional: '地方版',
+  plusone: 'プラスワン',
+  weekly: '週刊',
+  saturday: '土曜版',
+};
+const MAP_ED_FROM_CODE = {
+  m: 'morning',
+  e: 'evening',
+  r: 'regional',
+  p: 'plusone',
+};
+
+function mapLog(message) {
+  const el = $('mapUpdateLog');
+  if (el) el.innerHTML = `${escapeHtml(message)}<br>` + el.innerHTML;
+}
+
+function mapDateKey(value) {
+  if (!value) return '';
+  return String(value).replace(/-/g, '/').replace(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/, (_, y, m, d) => `${parseInt(m, 10)}/${parseInt(d, 10)}`);
+}
+
+function parseMapLocation(value) {
+  let place = '日本';
+  let lat = 35.6895;
+  let lng = 139.6917;
+  const raw = String(value || '').trim();
+  if (!raw) return { place, lat, lng };
+  try {
+    const data = JSON.parse(raw);
+    place = data.location || data.place || place;
+    lat = parseFloat(data.latitude ?? data.lat ?? lat);
+    lng = parseFloat(data.longitude ?? data.lng ?? lng);
+    return { place, lat, lng };
+  } catch {}
+  const lam = raw.match(/"latitude":\s*([\-\d.]+)/);
+  const lom = raw.match(/"longitude":\s*([\-\d.]+)/);
+  const lpm = raw.match(/"location":\s*"([^"]+)"/);
+  if (lam) lat = parseFloat(lam[1]);
+  if (lom) lng = parseFloat(lom[1]);
+  if (lpm) place = lpm[1];
+  return { place, lat, lng };
+}
+
+function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
+  const a = normalizeArticleRecord(article);
+  const loc = parseMapLocation(a.map_json || a['地図の住所'] || a.location);
+  const no = parseInt(a.no || a.No || idx + 1, 10) || idx + 1;
+  const edition = MAP_ED_FROM_CODE[String(a.edition || '').toLowerCase()] || defaultEdition;
+  const page = String(a.page || a['PDFページ'] || a.men || '').replace(/(\d+)\.0+/g, '$1');
+  return {
+    id: idBase + idx + 1,
+    no,
+    cat: String(a.genre || a.category || a['ジャンル'] || ''),
+    men: page,
+    title: String(a.headline || a.title || a['見出し'] || ''),
+    place: loc.place,
+    lat: loc.lat,
+    lng: loc.lng,
+    '内容': String(a.content_detail || a['内容・詳細'] || ''),
+    '思惑': String(a.intent_motive || a['思惑と狙い/本音'] || ''),
+    '理解': String(a.key_insights || a['理解すべき内容'] || ''),
+    quiz_q: String(a.quiz_q || a['クイズ（問）'] || ''),
+    quiz_a: String(a.quiz_a || a['クイズ（解）'] || ''),
+    quiz_kaisetsu: String(a.keyword || a['キーワード解説'] || ''),
+    '検索KW': '',
+    kws: [],
+    date: dateKey,
+    edition,
+    gid: `${dateKey}_${edition}_${no}`,
+  };
+}
+
+function buildMapRecordsFromCurrent() {
+  const dateKey = mapDateKey($('mapDateInput')?.value);
+  if (!dateKey) throw new Error('日付を指定してください');
+  const defaultEdition = $('mapEditionSelect')?.value || 'morning';
+  const baseId = mapArticles.length > 0 ? Math.max(...mapArticles.map(a => parseInt(a.id, 10) || 0)) : 0;
+  return state.articles.map((a, idx) => articleToMapRecord(a, idx, dateKey, defaultEdition, baseId));
+}
+
+function mergeMapRecords(records) {
+  if (!records.length) return 0;
+  const dates = new Set(records.map(a => a.date));
+  const editions = new Set(records.map(a => a.edition));
+  const before = mapArticles.length;
+  mapArticles = mapArticles.filter(a => !(dates.has(a.date) && editions.has(a.edition)));
+  const baseId = mapArticles.length > 0 ? Math.max(...mapArticles.map(a => parseInt(a.id, 10) || 0)) : 0;
+  records.forEach((a, idx) => { a.id = baseId + idx + 1; });
+  mapArticles = mapArticles.concat(records);
+  return before - mapArticles.length;
+}
+
+function downloadMapData(records, filename = 'data.json') {
+  const blob = new Blob([JSON.stringify(records)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+$('exportMapJson').addEventListener('click', () => {
+  try {
+    const rows = buildMapRecordsFromCurrent();
+    downloadMapData(rows);
+    mapLog(`抽出結果 ${rows.length}件を data.json として保存しました`);
+  } catch (err) {
+    alert(err.message || err);
+  }
+});
+
+$('loadMapJsonBtn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      mapArticles = Array.isArray(data) ? data : (data.articles || []);
+      $('downloadMapJsonBtn').disabled = false;
+      mapLog(`既存data.jsonを読み込み: ${mapArticles.length}件`);
+    } catch (err) {
+      alert('JSONを読み込めません: ' + (err.message || err));
+    }
+  };
+  input.click();
+});
+
+$('mergeCurrentMapBtn').addEventListener('click', () => {
+  try {
+    const rows = buildMapRecordsFromCurrent();
+    const removed = mergeMapRecords(rows);
+    $('downloadMapJsonBtn').disabled = false;
+    mapLog(`${rows.length}件を追加/差し替え${removed ? `（既存${removed}件削除）` : ''}`);
+  } catch (err) {
+    alert(err.message || err);
+  }
+});
+
+$('deleteMapDateBtn').addEventListener('click', () => {
+  const dateKey = mapDateKey($('mapDeleteDateInput').value);
+  if (!dateKey) {
+    alert('削除対象日付を入力してください');
+    return;
+  }
+  const before = mapArticles.length;
+  mapArticles = mapArticles.filter(a => a.date !== dateKey);
+  $('downloadMapJsonBtn').disabled = false;
+  mapLog(`${dateKey}: ${before - mapArticles.length}件削除`);
+});
+
+$('downloadMapJsonBtn').addEventListener('click', () => {
+  downloadMapData(mapArticles);
+  mapLog(`data.jsonを保存: ${mapArticles.length}件`);
+});
+
 function download(content, mime, ext) {
   const base = (state.pdfFile?.name || 'extract').replace(/\.pdf$/i, '');
   const blob = new Blob([content], { type: mime });
@@ -4430,7 +4573,7 @@ function download(content, mime, ext) {
       itemsPerPage: preset.itemsPerPage || ITEMS_PER_PAGE_DEFAULT,
     };
     $('rolePrompt').value = saved.role || preset.role;
-    $('extractionRules').value = saved.rules || preset.rules;
+    $('extractionRules').value = ensureOneLineLeadInstruction(saved.rules || preset.rules);
     $('presetDesc').textContent = preset.description;
     if (state.schema.enrichFields && state.schema.enrichFields.length > 0) {
       $('enrichLabel').classList.remove('hidden');
