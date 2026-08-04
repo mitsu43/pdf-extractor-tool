@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>PDF抽出ツール · 日経 & 汎用書籍対応</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -489,12 +490,6 @@ section { margin-bottom: 28px; }
 .v-check.fail .mark { color: var(--err); }
 .v-issues { margin-top: 12px; padding: 12px; background: rgba(184, 36, 42, 0.05); border-left: 3px solid var(--err); font-family: 'Noto Sans JP', sans-serif; font-size: 12px; }
 .v-issues ul { margin-left: 18px; margin-top: 6px; }
-.v-issue-details { margin: 6px 0 0 18px; color: var(--ink-soft); line-height: 1.7; }
-.v-issue-details li { margin: 2px 0; }
-.v-repair-all { display: inline-block; margin: 8px 0 4px; padding: 7px 12px; border: 1px solid var(--red); background: var(--red); color: white; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
-.v-repair-all:hover { filter: brightness(0.95); }
-.v-repair-btn { margin-left: 8px; padding: 2px 6px; border: 1px solid var(--line); background: white; color: var(--red); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; }
-.v-repair-btn:hover { background: #fdfaf1; }
 
 /* ============ Results ============ */
 .results-panel { background: white; border: 1px solid var(--line); }
@@ -527,6 +522,7 @@ table.results tr:hover td { background: #fdfaf1; }
 .detail-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; font-size: 12px; line-height: 1.7; }
 .detail-grid dt { font-weight: 700; color: var(--ink-soft); font-size: 11px; letter-spacing: 0.05em; }
 .detail-grid dd { color: var(--ink-soft); white-space: pre-wrap; }
+
 .map-update-panel { background: white; border: 1px solid var(--line); padding: 18px 20px; margin-top: 16px; font-family: 'Noto Sans JP', sans-serif; }
 .map-update-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .map-update-title { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
@@ -562,6 +558,15 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 #schemaJsonPanel summary::-webkit-details-marker { display: none; }
 #schemaJsonPanel summary > span:first-child { display: inline-block; transition: transform 0.15s; }
 #schemaJsonPanel[open] summary > span:first-child { transform: rotate(90deg); }
+
+@media (pointer: coarse) {
+  button, .btn { min-height: 44px; font-size: 15px; }
+  input, select, textarea { font-size: 16px !important; } /* iOS zoom防止 */
+  .sidebar { -webkit-overflow-scrolling: touch; }
+  .content { -webkit-overflow-scrolling: touch; }
+  #dropzone { padding: 40px 24px; min-height: 120px; }
+  #dropzone::after { content: '（タップしてPDFを選択）'; display: block; font-size: 12px; color: #999; margin-top: 6px; }
+}
 </style>
 </head>
 <body>
@@ -822,7 +827,11 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: #6b6359; line-height: 1.7; margin-bottom: 10px;" id="bulkPrepDesc">
           バッチ数分の分割PDFと指示文を一気に用意します。準備後、各バッチをGeminiの別タブで並行処理し、戻ってきたJSONを各欄に貼ると自動取込されます。
         </div>
-        <button class="btn btn-primary btn-sm" id="bulkPrepBtn">📦 全バッチを一括準備</button>
+        <div class="action-row" style="justify-content:flex-start; gap: 8px; flex-wrap: wrap; margin: 0;">
+          <button class="btn btn-primary btn-sm" id="bulkPrepBtn">📦 全バッチを一括準備</button>
+          <button class="btn btn-secondary btn-sm" id="openAllGeminiTabsBtn" disabled>🚀 Geminiタブ一括</button>
+          <button class="btn btn-secondary btn-sm" id="copyAllBatchPromptsBtn" disabled>📋 全指示文コピー</button>
+        </div>
       </div>
 
       <!-- Parallel batch grid -->
@@ -916,9 +925,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <button class="btn btn-secondary btn-sm" id="exportXlsx">Excel</button>
         <button class="btn btn-secondary btn-sm" id="exportCsv">CSV</button>
         <button class="btn btn-secondary btn-sm" id="exportMd">Markdown</button>
-        <button class="btn btn-secondary btn-sm" id="exportJson">JSON</button>
-        <button class="btn btn-secondary btn-sm" id="copyGenreBriefPromptBtn" title="抽出結果から大ジャンル総括をGeminiに依頼する指示文をコピー">総括プロンプト</button>
-        <button class="btn btn-secondary btn-sm" id="copyMapGenreBriefPromptBtn" title="Map data.json形式の結果から総括プロンプトをコピー">Map総括プロンプト</button>
+        <button class="btn btn-secondary btn-sm" id="exportJson">今回JSON</button>
         <button class="btn btn-secondary btn-sm" id="exportMapJson">Map data.json</button>
       </div>
     </div>
@@ -930,12 +937,12 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     </div>
     <div class="map-update-panel">
       <div class="map-update-head">
-        <span class="map-update-title">日経マップ data.json 更新</span>
+        <span class="map-update-title">日経マップ data-1.json 更新</span>
         <div class="map-update-actions">
-          <button class="btn btn-secondary btn-sm" id="loadMapJsonBtn">既存data.json読み込み</button>
+          <button class="btn btn-secondary btn-sm" id="loadMapJsonBtn">既存data-1.json読み込み</button>
           <button class="btn btn-secondary btn-sm" id="repairMapJsonBtn">記事JSONを自動修正</button>
           <button class="btn btn-secondary btn-sm" id="mergeCurrentMapBtn">抽出結果を追加/差し替え</button>
-          <button class="btn btn-secondary btn-sm" id="downloadMapJsonBtn" disabled>data.json保存</button>
+          <button class="btn btn-secondary btn-sm" id="downloadMapJsonBtn" disabled>data-1.json保存</button>
         </div>
       </div>
       <div class="map-io-grid">
@@ -945,12 +952,12 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
           <div>見出し・内容・思惑・理解・クイズ・地図JSONを変換</div>
         </div>
         <div class="map-io-card">
-          <strong>INPUT 2: 既存data.json</strong>
+          <strong>INPUT 2: 既存data-1.json</strong>
           <div>読み込み済み: <output id="mapInputExistingCount">0</output> 件</div>
           <div>同じ日付・版は追加時に自動差し替え</div>
         </div>
         <div class="map-io-card">
-          <strong>OUTPUT: data.json</strong>
+          <strong>OUTPUT: data-1.json</strong>
           <div>保存対象: <output id="mapOutputCount">0</output> 件</div>
           <div>id/no/gid/date/edition/座標を自動修正して保存</div>
         </div>
@@ -980,7 +987,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <button class="btn btn-secondary btn-sm" id="deleteMapDateBtn">指定日付を削除</button>
       </div>
       <div class="map-update-note">
-        抽出結果を日経マップ用data.json形式へ変換します。既存data.jsonを読み込むと、同じ日付・版は差し替えて保存できます。
+        最初に既存data-1.jsonを1回読み込み、各PDFの抽出結果を順番に追加します。同じ日付・版の最初の追加で旧データを差し替え、2回目以降は重複を除いて積み上げます。
       </div>
       <div class="map-update-log" id="mapUpdateLog">未読み込み</div>
     </div>
@@ -1019,19 +1026,6 @@ const TOKENS_PER_LONG_FIELD = 350;    // ~250 chars × 1.4
 const TOKENS_PER_SHORT_FIELD = 80;    // ~50 chars × 1.4
 const ITEMS_PER_PAGE_DEFAULT = 4;     // Rough density assumption
 
-const ONE_LINE_LEAD_INSTRUCTION = [
-  '【F〜H列の冒頭ルール】',
-  '内容・詳細、思惑と狙い/本音、理解すべき内容の3項目は、必ず各本文の冒頭に「一言でいうと、〇〇。」を入れる。',
-  '〇〇は記事の核心を20〜35字程度で要約する。冒頭の一文の後に、通常の詳しい説明・分析を続ける。',
-  '例: 一言でいうと、家計負担の増加が消費を冷やす局面です。...',
-].join('\n');
-
-function ensureOneLineLeadInstruction(rules) {
-  const base = String(rules || '').trim();
-  if (base.includes('【F〜H列の冒頭ルール】') || base.includes('一言でいうと、')) return base;
-  return `${base}${base ? '\n' : ''}${ONE_LINE_LEAD_INSTRUCTION}`;
-}
-
 // =====================================================================
 // SCHEMA PRESETS
 // =====================================================================
@@ -1039,7 +1033,7 @@ const PRESETS = {
   nikkei: {
     id: 'nikkei',
     name: '日経新聞（標準）',
-    description: '日経新聞から記事を抽出。A〜E列の基本情報 + F〜M列の深掘り分析・クイズ・地図JSON・版種。全13列。',
+    description: '日経新聞から記事を抽出。A〜E列の基本情報 + F〜N列の深掘り分析・クイズ・地図JSON・版種・記事位置。全14列。',
     itemsPerPage: 5,
     role: `あなたは日本経済新聞の読者層にふさわしい、知的で洞察に満ちた表現を用いる、国際情勢と金融市場に精通したシニアエコノミストです。
 単なる事実の羅列ではなく、経済のダイナミズムを感じさせる専門的な分析を行います。`,
@@ -1054,11 +1048,10 @@ const PRESETS = {
       '副題がある場合は headline に「主見出し　副見出し」のように併記',
       '1面上部・左部のカラム記事（他ページに本記事があるもの）は抽出しない',
       '数学記号（∑、√、∞、∫、≠、≒、≤、≥）は使用禁止。日本語で表現',
-      ONE_LINE_LEAD_INSTRUCTION,
       '全件出すこと。一括で出せないなら分割で出すこと',
     ].join('\n'),
     enrichEnabled: true,
-    enrichLabel: 'F〜M列（深掘り分析・クイズ・地図JSON・版種）も生成',
+    enrichLabel: 'F〜N列（深掘り分析・クイズ・地図JSON・版種・記事位置）も生成',
     fields: [
       { key: 'no',       label: 'No',         type: 'integer', required: true, desc: '【A列】1からの連番。絶対に飛ばさず、欠番なく、必ず1ずつ増やすこと' },
       { key: 'genre',    label: 'ジャンル',    type: 'string',  required: true, desc: '【B列】必ず次のいずれかに分類', enumValues: '国際情勢,国内,国内地域,コラム,ランキング・くらし,生活・社会,スポーツ,文化,その他' },
@@ -1067,14 +1060,15 @@ const PRESETS = {
       { key: 'headline', label: '見出し',      type: 'string',  required: true, desc: '【E列】記事のメインタイトル（副題があれば「主見出し　副見出し」のように併記）' },
     ],
     enrichFields: [
-      { key: 'content_detail', label: '内容・詳細',    type: 'string', long: true,  desc: '【F列】必ず冒頭を「一言でいうと、〇〇。」で始める。300字程度。背景・具体的な数値・今後の見通し・裏の意図を盛り込み、単なる要約でなく「読み物」として成立させる' },
-      { key: 'intent_motive',  label: '思惑と狙い/本音', type: 'string', long: true, desc: '【G列】必ず冒頭を「一言でいうと、〇〇。」で始める。政府・国家・企業・投資家などの関係者が持つ「真の意図」「報じられていない本音」を専門的に深掘り分析' },
-      { key: 'key_insights',   label: '理解すべき内容',type: 'string', long: true,  desc: '【H列】必ず冒頭を「一言でいうと、〇〇。」で始める。ビジネスパーソンや投資家が、その記事をなぜ重要視すべきか、社会に与えるインパクト' },
+      { key: 'content_detail', label: '記事内容要約',    type: 'string', long: true,  desc: '【F列】120〜160字程度。背景・具体的な数値・今後の見通しを要点だけに絞る。冗長な前置きは禁止。読み上げやすい2〜3文に収める' },
+      { key: 'intent_motive',  label: '思惑と狙い/本音', type: 'string', long: true, desc: '【G列】60〜100字程度。関係者の思惑・狙い・本音を1〜2文で簡潔に述べる。深掘りしすぎず、要点だけにする' },
+      { key: 'key_insights',   label: '記者が伝えたいこと',type: 'string', long: true,  desc: '【H列】60〜100字程度。読者が理解すべき意味・影響を1〜2文で簡潔に述べる' },
       { key: 'quiz_q',         label: 'クイズ（問）',  type: 'string', long: false, desc: '【I列】記事の重要ポイントから理解度を測る問い' },
       { key: 'quiz_a',         label: 'クイズ（解）',  type: 'string', long: false, desc: '【J列】クイズの正解' },
       { key: 'keyword',        label: 'キーワード解説',type: 'string', long: false, desc: '【K列】正解や記事内容に関連する専門用語を1つ選び解説' },
       { key: 'map_json',       label: '地図の住所',    type: 'string', long: false, desc: '【L列】関連場所の名称と正確な緯度・経度を単一行JSONで記載: { "location": "名称", "latitude": 0.0, "longitude": 0.0 }。Google Mapsで検索可能な形式: 国際=「中国 北京市」、国内=「東京都千代田区」。会談は開催都市、企業ニュースは本社所在地、市場ニュースは取引所所在地。空欄禁止。抽象的な記事は「日本」を使用。改行・インデント禁止' },
       { key: 'edition',        label: '版種',          type: 'string', long: false, desc: '【M列】ファイル名末尾に基づき判別: m=朝刊 / e=夕刊 / r=地方版 / p=プラス1', enumValues: 'm,e,r,p' },
+      { key: 'article_boxes',  label: '記事位置',      type: 'string', long: false, desc: '【N列】記事の見出しと本文が占める範囲。PDFページ全体を縦1000×横1000とし、上,左,下,右の整数をカンマ区切りで記載。例: 120,620,900,980。離れた複数範囲はセミコロンで連結。例: 120,620,900,980;120,400,900,600。隣接記事・広告・余白は含めない。空欄禁止' },
     ],
   },
 
@@ -1332,7 +1326,7 @@ function applyPreset(presetId) {
     itemsPerPage: p.itemsPerPage || ITEMS_PER_PAGE_DEFAULT,
   };
   $('rolePrompt').value = p.role;
-  $('extractionRules').value = ensureOneLineLeadInstruction(p.rules);
+  $('extractionRules').value = p.rules;
   $('presetDesc').textContent = p.description;
 
   // Enrich checkbox visibility
@@ -1672,10 +1666,10 @@ $('copySchemaPromptBtn').addEventListener('click', async () => {
 
 - **fields (A〜E列): 基本情報のみ**。PDFを見れば即座に分かる項目。
   例: no(連番), ジャンル, カテゴリ, ページ番号, 見出し
-  → ここに「内容・詳細」「クイズ」「分析」などは入れない
+  → ここに「記事内容要約」「クイズ」「分析」などは入れない
 
 - **enrichFields (F列以降): 深掘り分析・派生情報のみ**。fieldsの情報をもとにAIが推論・生成する項目。
-  例: 内容詳細, 思惑分析, 理解すべき内容, クイズ, キーワード, 地図JSON, 版種
+  例: 記事内容要約, 思惑分析, 記者が伝えたいこと, クイズ, キーワード, 地図JSON, 版種
   → ここに「no」「見出し」「ページ」など fieldsで定義した項目を再掲しない
 
 【正しい出力形式（厳守）】
@@ -1690,9 +1684,9 @@ $('copySchemaPromptBtn').addEventListener('click', async () => {
     { "key": "headline", "label": "見出し",     "type": "string",  "required": true,  "desc": "記事のメインタイトル" }
   ],
   "enrichFields": [
-    { "key": "content_detail", "label": "内容・詳細",    "type": "string", "long": true,  "desc": "300字程度の解説" },
-    { "key": "intent_motive",  "label": "思惑と狙い",     "type": "string", "long": true,  "desc": "関係者の真の意図を分析" },
-    { "key": "key_insights",   "label": "理解すべき内容", "type": "string", "long": true,  "desc": "なぜ重要か" },
+    { "key": "content_detail", "label": "記事内容要約",    "type": "string", "long": true,  "desc": "120〜160字程度の記事内容要約" },
+    { "key": "intent_motive",  "label": "思惑と狙い",     "type": "string", "long": true,  "desc": "60〜100字程度で関係者の意図を簡潔に分析" },
+    { "key": "key_insights",   "label": "記者が伝えたいこと", "type": "string", "long": true,  "desc": "60〜100字程度で記者が伝えたいことを簡潔に説明" },
     { "key": "quiz_q",         "label": "クイズ(問)",     "type": "string", "long": false, "desc": "問題文" },
     { "key": "quiz_a",         "label": "クイズ(解)",     "type": "string", "long": false, "desc": "解答" },
     { "key": "keyword",        "label": "キーワード解説", "type": "string", "long": false, "desc": "専門用語の解説" },
@@ -2066,15 +2060,22 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 // =====================================================================
 const dropzone = $('dropzone');
 const fileInput = $('fileInput');
+const isIpadEnv = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 dropzone.addEventListener('click', () => fileInput.click());
-dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
-dropzone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dropzone.classList.remove('drag');
-  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-});
+if(!isIpadEnv){
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+} else {
+  // iPad: ドラッグ不可の旨を表示
+  const hint = dropzone.querySelector('.hint, p, small');
+  if(hint) hint.textContent = 'タップしてPDFを選択';
+}
 fileInput.addEventListener('change', (e) => {
   if (e.target.files[0]) handleFile(e.target.files[0]);
 });
@@ -2489,6 +2490,60 @@ async function callGemini(prompt, schema, opts = {}) {
 
 // Try to recover a partial JSON array — find last complete '}' before truncation
 // and close the array there. Returns parsed array or null.
+function repairLooseJsonText(text) {
+  let s = String(text || '').trim();
+  if (!s) return s;
+  // Remove common invisible/control characters that Gemini occasionally emits.
+  s = s.replace(/\uFEFF/g, '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ');
+  // Normalize Japanese/curly quotes only when they are used as JSON delimiters.
+  s = s.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+  // Quote unquoted object keys: { no: 1 } or , page: 2
+  s = s.replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":');
+  // Remove trailing commas before object/array close.
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  return s;
+}
+
+function splitLooseJsonObjects(text) {
+  const s = String(text || '').trim();
+  const objects = [];
+  let start = -1;
+  let depth = 0;
+  let inStr = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        objects.push(s.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return objects;
+}
+
+function parseLooseJsonObjects(text) {
+  const rows = [];
+  for (const rawObj of splitLooseJsonObjects(text)) {
+    const repaired = repairLooseJsonText(rawObj);
+    try {
+      rows.push(JSON.parse(repaired));
+    } catch {
+      // Skip the one broken object and keep usable records from the same batch.
+    }
+  }
+  return rows.length ? rows : null;
+}
+
 function trySalvagePartialJsonArray(text) {
   const s = text.trim();
   if (!s.startsWith('[')) return null;
@@ -2551,7 +2606,7 @@ function buildSchemaExample(fields, startNo) {
 
 function buildExtractionPrompt(startPage, endPage, startNo) {
   const role = $('rolePrompt').value.trim();
-  const rules = ensureOneLineLeadInstruction($('extractionRules').value);
+  const rules = $('extractionRules').value.trim();
   const pageList = [];
   for (let p = startPage; p <= endPage; p++) pageList.push(p);
   const pageCount = endPage - startPage + 1;
@@ -2599,8 +2654,6 @@ ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 【抽出ルール】
 ${rules}
 
-${ONE_LINE_LEAD_INSTRUCTION}
-
 【禁止事項（再掲・厳守）】
 - 「[cite: 24, 63]」「[cite_start]」「[24, 63]」のような引用タグは絶対に出力しないこと
 - 数学記号（∑、√、∞、∫、≠、≒、≤、≥）は使用禁止。日本語で表現すること`;
@@ -2613,6 +2666,9 @@ function buildEnrichmentPrompt(articleBatch, editionCode) {
   const hasLocationField = state.schema.enrichFields && state.schema.enrichFields.some(f =>
     /location|address|地図|住所|場所|location_name/i.test(f.key) ||
     /地図|住所|場所/.test(f.label || '')
+  );
+  const hasArticleBoxesField = state.schema.enrichFields && state.schema.enrichFields.some(f =>
+    f.key === 'article_boxes' || /記事位置/.test(f.label || '')
   );
 
   return `${role}
@@ -2632,15 +2688,21 @@ ${editionCode}
 ${buildSchemaDescription(state.schema.enrichFields)}
 
 【トーン＆マナー】
-専門的で読者層に適した知的な表現。事実の羅列でなく洞察に満ちた分析を行うこと。
-
-${ONE_LINE_LEAD_INSTRUCTION}
+専門的で読者層に適した知的な表現。ただし読み上げ時間を抑えるため、記事内容要約は120〜160字、思惑と狙い/本音と記者が伝えたいことは各60〜100字を厳守すること。
 
 ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 - 地図・住所・場所フィールドは原則として必ず記入してください。空文字は最終手段。
 - 記事の主な舞台となる地名を Google Maps で検索可能な形式で記入: 国際=「中国 北京市」、国内=「東京都千代田区」など。
 - 会談記事は開催都市、企業ニュースは本社所在地、市場ニュースは取引所所在地、政治記事は当該議会・政府機関の所在地。
 - 経度緯度フィールドがある場合は、その住所に対応する実際の座標を入れる（推定でよい）。
+
+` : ''}${hasArticleBoxesField ? `【記事位置フィールドの厳守事項】
+- 各記事が載っているPDF物理ページ全体を縦1000×横1000とします。
+- 記事の見出しと本文を囲む範囲を、上,左,下,右の順に0〜1000の整数で記載してください。
+- 単一範囲の例: 120,620,900,980
+- 複数の離れた段にまたがる例: 120,620,900,980;120,400,900,600
+- 隣接記事、広告、余白は含めず、空欄にしないでください。
+- JSON配列や括弧は使わず、上記の数字と区切り文字だけを値に入れてください。
 
 ` : ''}【禁止事項（再掲・厳守）】
 - 「[cite: 24, 63]」「[cite_start]」「[24, 63]」のような引用タグは絶対に出力しないこと
@@ -2665,6 +2727,7 @@ function makeManualPrompt(kind, payload) {
 
 【重要】回答はJSONコードブロック1個だけで返してください。説明文、前置き、表、箇条書きは禁止です。
 必ず \`\`\`json で開始し、\`\`\` で終了してください。
+【JSON破損防止】本文中にダブルクォート（"）を使わないでください。必要なら鉤括弧「」に置換してください。各値の中に改行を入れず、すべて1行の文字列にしてください。バックスラッシュも使わないでください。
 添付したPDF「${state.pdfFile?.name || ''}」を参照してください。PDFビューアの印字面番号ではなく、PDFの物理ページ番号を使ってください。`;
 
   // Combined mode: when F-M generation is enabled in manual mode, merge fields + enrichFields
@@ -2686,6 +2749,9 @@ function makeManualPrompt(kind, payload) {
   const hasMapJsonField = allFields.some(f =>
     f.key === 'map_json' || /map_json/i.test(f.key) || /地図.*JSON|地図の住所/.test(f.label || '')
   );
+  const hasArticleBoxesField = allFields.some(f =>
+    f.key === 'article_boxes' || /記事位置/.test(f.label || '')
+  );
   const locationGuide = hasMapJsonField ? `
 
 【地図の住所(JSON)フィールドの厳守事項】
@@ -2701,10 +2767,19 @@ function makeManualPrompt(kind, payload) {
 - 必ず記入。空文字は最終手段。
 - 国際=「国名 + 都市名」、国内=「都道府県 + 市区町村」
 - 会談記事は開催都市、企業は本社、市場は取引所所在地。` : '');
+  const articleBoxesGuide = hasArticleBoxesField ? `
+
+【記事位置フィールドの厳守事項】
+- 各記事が載っている元PDFの物理ページ全体を縦1000×横1000とする
+- 見出しと本文を囲む範囲を、上,左,下,右の順に0〜1000の整数で記載する
+- 単一範囲の例: 120,620,900,980
+- 離れた複数の段はセミコロンで連結する。例: 120,620,900,980;120,400,900,600
+- 隣接記事、広告、余白は含めない。空欄禁止
+- JSON配列や括弧は使わず、数字、カンマ、セミコロンだけで記載する` : '';
 
   if (kind === 'extract') {
     const role = $('rolePrompt').value.trim();
-    const rules = ensureOneLineLeadInstruction($('extractionRules').value);
+    const rules = $('extractionRules').value.trim();
     const example = buildSchemaExample(allFields, payload.startNo);
     const pageCount = payload.endPage - payload.startPage + 1;
     const enrichNote = includeEnrich
@@ -2735,9 +2810,7 @@ ${enrichNote}
 ${buildSchemaDescription(allFields)}
 
 【抽出ルール】
-${rules}${locationGuide}
-
-${ONE_LINE_LEAD_INSTRUCTION}
+${rules}${locationGuide}${articleBoxesGuide}
 
 【出力例（1件分の例）】
 ${example}
@@ -2746,8 +2819,9 @@ ${example}
 - noは${payload.startNo}から1ずつ連続。欠番禁止、飛ばし禁止
 - pageは ${payload.startPage}〜${payload.endPage} の範囲内の元PDFページ番号
 - 添付PDFの全${pageCount}ページから記事を漏らさず抽出。広告・株価表のみ除外
-- 各記事ごとに全${allFields.length}項目すべて埋めること（${includeEnrich ? '内容・詳細、思惑、クイズ、地図JSON、版種まで' : ''}）
-- JSON配列を \`\`\`json のコードブロック1個だけで返す`;
+- 各記事ごとに全${allFields.length}項目すべて埋めること（${includeEnrich ? '記事内容要約、思惑、クイズ、地図JSON、版種まで' : ''}）
+- JSON配列を \`\`\`json のコードブロック1個だけで返す
+- 文字列内のダブルクォートは使わず、鉤括弧「」に置換する。文字列内改行は禁止`;
   }
 
   // Enrichment-only mode (when combined mode is off, second-step prompt)
@@ -2763,13 +2837,12 @@ ${payload.editionCode !== '?' ? `版種: ${payload.editionCode} (m=朝刊 / e=�
 ${JSON.stringify(payload.articles, null, 2)}
 
 【生成項目】
-${buildSchemaDescription(state.schema.enrichFields)}${locationGuide}
-
-${ONE_LINE_LEAD_INSTRUCTION}
+${buildSchemaDescription(state.schema.enrichFields)}${locationGuide}${articleBoxesGuide}
 
 注意:
 - 入力データの no を必ず保持
 - JSON配列を \`\`\`json のコードブロック1個だけで返す
+- 文字列内のダブルクォートは使わず、鉤括弧「」に置換する。文字列内改行は禁止
 - 【再掲・厳守】「[cite: 24, 63]」のような引用タグは一切出力しない`;
 }
 
@@ -2830,6 +2903,15 @@ function renderBatchGrid() {
   // Show or hide the prep banner
   $('bulkPrepBtn').textContent = prepared ? '✓ 準備完了（再準備するならタップ）' : '📦 全バッチを一括準備';
   $('bulkPrepBtn').disabled = false;
+  const openAllGeminiTabsBtn = $('openAllGeminiTabsBtn');
+  const copyAllBatchPromptsBtn = $('copyAllBatchPromptsBtn');
+  if (openAllGeminiTabsBtn) {
+    openAllGeminiTabsBtn.textContent = prepared ? '🚀 Geminiタブ一括' : '🚀 準備してGemini一括';
+    openAllGeminiTabsBtn.disabled = false;
+  }
+  if (copyAllBatchPromptsBtn) {
+    copyAllBatchPromptsBtn.disabled = !prepared;
+  }
 
   // Build tiles HTML
   grid.innerHTML = m.batches.map(b => {
@@ -2849,9 +2931,9 @@ function renderBatchGrid() {
           </span>
         </div>
         <div class="batch-tile-actions">
-          <button class="btn btn-primary btn-sm batch-gemini-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>🚀 Geminiで開く</button>
           <button class="btn btn-secondary btn-sm batch-pdf-btn" data-batch-id="${b.id}" ${pdfBtnDisabled}>📎 PDFダウンロード</button>
           <button class="btn btn-secondary btn-sm batch-prompt-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>📋 指示文コピー</button>
+          <button class="btn btn-secondary btn-sm batch-gemini-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>🚀 Geminiを開く</button>
           ${b.status === 'done' || b.status === 'error' ? `<button class="btn btn-secondary btn-sm batch-clear-btn" data-batch-id="${b.id}">✕ クリア</button>` : ''}
         </div>
         <textarea
@@ -2866,14 +2948,14 @@ function renderBatchGrid() {
   }).join('');
 
   // Bind events
-  grid.querySelectorAll('.batch-gemini-btn').forEach(btn => {
-    btn.addEventListener('click', () => openGeminiForBatch(parseInt(btn.dataset.batchId)));
-  });
   grid.querySelectorAll('.batch-pdf-btn').forEach(btn => {
     btn.addEventListener('click', () => downloadBatchPdf(parseInt(btn.dataset.batchId)));
   });
   grid.querySelectorAll('.batch-prompt-btn').forEach(btn => {
     btn.addEventListener('click', () => copyBatchPrompt(parseInt(btn.dataset.batchId)));
+  });
+  grid.querySelectorAll('.batch-gemini-btn').forEach(btn => {
+    btn.addEventListener('click', () => openGeminiForBatch(parseInt(btn.dataset.batchId)));
   });
   grid.querySelectorAll('.batch-clear-btn').forEach(btn => {
     btn.addEventListener('click', () => clearBatch(parseInt(btn.dataset.batchId)));
@@ -2913,6 +2995,9 @@ function debounce(fn, ms) {
 }
 
 // "Bulk prepare" — initialize prompts for all batches (PDFs are generated on-demand per batch)
+$('openAllGeminiTabsBtn')?.addEventListener('click', openAllGeminiTabs);
+$('copyAllBatchPromptsBtn')?.addEventListener('click', copyAllBatchPrompts);
+
 $('bulkPrepBtn').addEventListener('click', async () => {
   const m = state.manual;
   if (!m) return;
@@ -2922,7 +3007,7 @@ $('bulkPrepBtn').addEventListener('click', async () => {
     // Just mark as prepared — PDF splits and prompt generation happen on-demand per tile
     m.prepared = true;
     renderBatchGrid();
-    log(`📦 全 ${m.batches.length} バッチの準備完了。各タイルの「📎 PDFダウンロード」「📋 指示文コピー」を使って並列処理してください`, 'ok');
+    log(`📦 全 ${m.batches.length} バッチの準備完了。「🚀 Geminiタブ一括」でバッチ数分のGeminiを開けます`, 'ok');
   } catch (err) {
     log(`一括準備エラー: ${err.message}`, 'err');
     alert('準備に失敗: ' + err.message);
@@ -2931,31 +3016,101 @@ $('bulkPrepBtn').addEventListener('click', async () => {
   }
 });
 
-async function openGeminiForBatch(batchId) {
+function ensureManualPrepared() {
   const m = state.manual;
-  const b = m?.batches[batchId];
-  if (!b) return;
-
-  // Open immediately while still inside the click gesture. Browsers may block
-  // window.open after awaits.
-  const geminiTab = window.open('about:blank', '_blank');
-
-  try {
-    await copyBatchPrompt(batchId);
-    await downloadBatchPdf(batchId);
-    if (geminiTab) {
-      geminiTab.location.href = 'https://gemini.google.com/app';
-    } else {
-      window.open('https://gemini.google.com/app', '_blank');
-    }
-    b.status = b.status === 'done' ? 'done' : 'editing';
-    b.summary = `Geminiタブを開きました。ダウンロードした P${b.startPage}〜P${b.endPage} PDF を添付し、コピー済みの指示文を貼り付けてください。`;
+  if (!m || !m.batches || !m.batches.length) return false;
+  if (!m.prepared) {
+    m.prepared = true;
     renderBatchGrid();
-    log(`🚀 バッチ${batchId+1}: PDFダウンロード + 指示文コピー + Gemini起動`, 'ok');
+  }
+  return true;
+}
+
+function buildBatchPrompt(batchId) {
+  const m = state.manual;
+  const b = m?.batches?.[batchId];
+  if (!b) return '';
+  // Parallel batches are merged and renumbered later, so this is only a stable estimate for Gemini.
+  const startNo = (batchId * m.batchSize * 5) + 1;
+  const editionCode = detectEdition(state.pdfFile?.name || '');
+  return makeManualPrompt('extract', {
+    startPage: b.startPage,
+    endPage: b.endPage,
+    startNo,
+    editionCode,
+  });
+}
+
+function openGeminiTab(batchId) {
+  const target = `gemini_batch_${batchId + 1}_${Date.now()}`;
+  try {
+    window.open('https://gemini.google.com/app', target);
+    return true;
   } catch (err) {
-    if (geminiTab) geminiTab.close();
-    log(`Gemini起動準備エラー (バッチ${batchId+1}): ${err.message}`, 'err');
-    alert('Gemini起動準備に失敗: ' + err.message);
+    log(`Geminiタブ起動エラー: ${err.message}`, 'warn');
+    return false;
+  }
+}
+
+async function copyPromptText(prompt, successMessage) {
+  try {
+    await navigator.clipboard.writeText(prompt);
+    log(successMessage, 'ok');
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = prompt;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) log(successMessage, 'ok');
+    return ok;
+  }
+}
+
+async function openGeminiForBatch(batchId) {
+  if (!ensureManualPrepared()) return;
+  const prompt = buildBatchPrompt(batchId);
+  const opened = openGeminiTab(batchId);
+  const copied = await copyPromptText(prompt, `📋 バッチ${batchId + 1}: 指示文をコピーしました`);
+  if (opened) {
+    log(`🚀 バッチ${batchId + 1}: Geminiを開く操作を実行しました。開いたタブに指示文を貼り付けてください`, 'ok');
+  } else {
+    log('Geminiタブを開けませんでした。ポップアップ許可を確認してください', 'warn');
+  }
+  if (!copied) log('指示文をコピーできませんでした。個別の「指示文コピー」を押してください', 'warn');
+}
+
+async function copyAllBatchPrompts() {
+  const m = state.manual;
+  if (!m || !m.batches?.length || !m.prepared) return;
+  const allPrompts = m.batches.map(b => (
+    `--- バッチ ${b.id + 1} / ${m.batches.length} P${b.startPage}-P${b.endPage} ---\n\n${buildBatchPrompt(b.id)}`
+  )).join('\n\n');
+  const ok = await copyPromptText(allPrompts, `📋 全 ${m.batches.length} バッチ分の指示文をまとめてコピーしました`);
+  if (!ok) log('全指示文をコピーできませんでした。各バッチの「指示文コピー」を使ってください', 'warn');
+}
+
+async function openAllGeminiTabs() {
+  const m = state.manual;
+  if (!ensureManualPrepared()) return;
+  const total = m.batches.length;
+  if (total > 12 && !confirm(`Geminiタブを ${total} 個開きます。続けますか？`)) return;
+
+  let opened = 0;
+  m.batches.forEach(b => {
+    if (openGeminiTab(b.id)) opened += 1;
+  });
+
+  const firstPrompt = buildBatchPrompt(0);
+  await copyPromptText(firstPrompt, '📋 バッチ1の指示文をコピーしました。まず1つ目のGeminiタブに貼り付けてください');
+
+  log(`🚀 Geminiタブ起動を ${opened}/${total} 件実行しました。バッチ1の指示文はコピー済みです`, opened ? 'ok' : 'warn');
+  if (opened < total) {
+    log('一部のタブが開かない場合は、ブラウザのポップアップ許可後に再度押してください', 'warn');
   }
 }
 
@@ -2983,19 +3138,9 @@ async function downloadBatchPdf(batchId) {
 
 async function copyBatchPrompt(batchId) {
   const m = state.manual;
-  const b = m?.batches[batchId];
+  const b = m?.batches?.[batchId];
   if (!b) return;
-  // Build prompt for this specific batch
-  // For startNo: use the cumulative count from earlier completed batches (best effort)
-  // Since batches process in parallel, no really reliable startNo — use page-based naming
-  const startNo = (batchId * m.batchSize * 5) + 1; // rough estimate; will be renumbered on merge
-  const editionCode = detectEdition(state.pdfFile.name);
-  const prompt = makeManualPrompt('extract', {
-    startPage: b.startPage,
-    endPage: b.endPage,
-    startNo,
-    editionCode,
-  });
+  const prompt = buildBatchPrompt(batchId);
   try {
     await navigator.clipboard.writeText(prompt);
     log(`📋 バッチ${batchId+1}: 指示文をコピーしました`, 'ok');
@@ -3055,8 +3200,9 @@ function importBatchJson(batchId, text) {
     b.articles = null;
     b.articleCount = 0;
     b.status = 'error';
-    b.summary = `✕ 取り込みエラー: ${err.message}`;
+    b.summary = `✕ 取り込みエラー: ${err.message}。Geminiに「JSON配列だけで再出力。本文中のダブルクォートは使わず、改行は入れない」と送って再貼り付けしてください`;
     log(`バッチ${batchId+1} 取り込みエラー: ${err.message}`, 'err');
+    log(`バッチ${batchId+1}: Geminiに「JSON配列だけで再出力。本文中のダブルクォートは使わず、改行は入れない」と送ると通りやすいです`, 'warn');
     renderBatchGrid();
   }
 }
@@ -3166,30 +3312,6 @@ function normalizeMapJson(value) {
 
 function normalizeArticleRecord(record) {
   const out = deepStripCites(record || {});
-  const fieldAliasMap = {
-    keyword: [
-      'keyword_explanation',
-      'keywordExplanation',
-      'keyword_detail',
-      'keywordDetail',
-      'keywords',
-      'キーワード',
-      'キーワード解説',
-      '専門用語解説',
-    ],
-    content_detail: ['contentDetail', '内容・詳細', '内容詳細'],
-    intent_motive: ['intentMotive', '思惑と狙い/本音', '思惑分析', '思惑と狙い'],
-    key_insights: ['keyInsights', '理解すべき内容'],
-    quiz_q: ['quizQ', 'quiz_question', 'クイズ（問）', 'クイズ問'],
-    quiz_a: ['quizA', 'quiz_answer', 'クイズ（解）', 'クイズ解'],
-    map_json: ['mapJson', 'map', '地図の住所', '地図の住所(JSON)', '地図JSON'],
-    edition: ['版種'],
-  };
-  Object.entries(fieldAliasMap).forEach(([key, aliases]) => {
-    if (out[key] !== undefined && out[key] !== null && out[key] !== '') return;
-    const alias = aliases.find(name => out[name] !== undefined && out[name] !== null && out[name] !== '');
-    if (alias) out[key] = out[alias];
-  });
   if ('no' in out) out.no = coerceInteger(out.no) ?? out.no;
   if ('page' in out) out.page = coerceInteger(out.page) ?? out.page;
   if ('map_json' in out) out.map_json = normalizeMapJson(out.map_json);
@@ -3207,25 +3329,31 @@ function parseManualResponse(text) {
   const last = cleaned.lastIndexOf(']');
   const body = (first >= 0 && last > first) ? cleaned.slice(first, last + 1) : cleaned;
 
-  // First attempt: parse as-is
-  try {
-    return deepStripCites(JSON.parse(body)).map(normalizeArticleRecord);
-  } catch (firstErr) {
-    // Second attempt: salvage truncated JSON (find last complete object)
-    const salvaged = trySalvagePartialJsonArray(body);
-    if (salvaged && salvaged.length > 0) {
-      return deepStripCites(salvaged).map(normalizeArticleRecord);
+  const attempts = [body, repairLooseJsonText(body)];
+  for (const candidate of attempts) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      return deepStripCites(arr).map(normalizeArticleRecord);
+    } catch {
+      // Try the next repair path below.
     }
-    // Third attempt: maybe the closing ] is missing. Try to find the start [
-    // and walk until last complete top-level object, then synthesize the close.
-    if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
-      const fallback = trySalvagePartialJsonArray(cleaned);
-      if (fallback && fallback.length > 0) {
-        return deepStripCites(fallback).map(normalizeArticleRecord);
-      }
-    }
-    throw firstErr;
   }
+
+  // Salvage truncated JSON (find last complete object).
+  const salvaged = trySalvagePartialJsonArray(repairLooseJsonText(body)) || trySalvagePartialJsonArray(body);
+  if (salvaged && salvaged.length > 0) {
+    return deepStripCites(salvaged).map(normalizeArticleRecord);
+  }
+
+  // Last resort: import only complete objects that can still be parsed.
+  const looseRows = parseLooseJsonObjects(body) || parseLooseJsonObjects(cleaned);
+  if (looseRows && looseRows.length > 0) {
+    log(`⚠ JSONの一部が壊れていたため、読める ${looseRows.length} 件だけ救出しました`, 'warn');
+    return deepStripCites(looseRows).map(normalizeArticleRecord);
+  }
+
+  JSON.parse(body);
 }
 
 async function copyText(text) {
@@ -3511,7 +3639,7 @@ async function runExtraction(opts = {}) {
   updateStartBtn();
 
   // Test mode: process only 1 page, batchSize=1
-  const userBatchSize = testOnly ? 1 : Math.max(2, parseInt($('batchSize').value) || 10);
+  const userBatchSize = testOnly ? 1 : Math.max(2, parseInt($('batchSize').value) || 5);
   const maxRetry = parseInt($('maxRetry').value) || 4;
   const enrich = state.schema.enrichFields && $('enrichFM').checked;
   const strict = $('strictMode').checked;
@@ -3886,37 +4014,6 @@ function getEffectiveCallIntervalMs() {
 // =====================================================================
 // Validation (schema-aware)
 // =====================================================================
-function pickRepairKeyword(article) {
-  const text = [
-    article.headline,
-    article.quiz_a,
-    article.quiz_q,
-    article.content_detail,
-    article.key_insights,
-    article.intent_motive,
-  ].map(v => String(v || '')).join(' ');
-  const quoted = [...text.matchAll(/[「『]([^」』]{2,35})[」』]/g)].map(m => m[1].trim());
-  if (quoted.length > 0) return quoted[0];
-  const acronym = text.match(/[（(]([A-Za-z][A-Za-z0-9&.\- ]{2,20})[）)]/);
-  if (acronym) return acronym[1].trim();
-  const first = String(article.headline || article.category || article.genre || 'この記事の重要語')
-    .split(/[、。\s]/).find(s => s.length >= 3);
-  return first || 'この記事の重要語';
-}
-
-function buildMissingFieldSuggestion(article, key, label) {
-  const headline = String(article.headline || article.title || '').trim();
-  if (key === 'keyword') {
-    const word = pickRepairKeyword(article);
-    return `${word}: ${headline ? `${headline}を理解するうえで重要な用語。` : 'この記事を理解するうえで重要な用語。'}背景や影響を読み解く手がかりとなる。`;
-  }
-  if (key === 'edition') return detectEdition(state.pdfFile?.name || '') !== '?' ? detectEdition(state.pdfFile?.name || '') : 'm';
-  if (key === 'map_json') return '{ "location": "日本", "latitude": 35.6762, "longitude": 139.6503 }';
-  if (key === 'quiz_q') return headline ? `この記事の重要なポイントは何か。` : 'この記事の重要なポイントは何か。';
-  if (key === 'quiz_a') return headline ? `${headline}に関する内容を確認する。` : '記事内容を確認する。';
-  return headline ? `${headline}に関する内容。` : `${label}に関する内容。`;
-}
-
 // Returns { issues: string[], fixed: array } — auto-corrects out-of-range pages
 // when only 1 page is in the batch (unambiguous fix). Returns issues only for
 // genuinely fatal problems (missing required fields, empty result).
@@ -3991,17 +4088,6 @@ function runValidation() {
 
   const noField = state.schema.fields.find(f => f.key === 'no');
   const pageField = state.schema.fields.find(f => f.key === 'page');
-  const isBlank = (v) => v === undefined || v === null || v === '';
-  const articleLabel = (a, idx) => {
-    const no = a.no || (idx + 1);
-    const page = a.page ? `P${a.page}` : 'P?';
-    const headline = String(a.headline || a.title || '').trim();
-    return `No.${no} / ${page}${headline ? ` / ${headline.slice(0, 60)}` : ''}`;
-  };
-  const missingRowsFor = (field) => arr
-    .map((a, idx) => ({ a, idx }))
-    .filter(({ a }) => isBlank(a[field.key]))
-    .map(({ a, idx }) => ({ idx, text: articleLabel(a, idx) }));
 
   // Check 1: Sequence (if no field exists)
   if (noField) {
@@ -4015,15 +4101,7 @@ function runValidation() {
   // Check 2: All pages present (if page field exists)
   if (pageField) {
     const noPage = arr.filter(a => !a.page);
-    checks.push({
-      label: 'ページ番号 全件記載',
-      ok: noPage.length === 0,
-      detail: noPage.length > 0 ? `${noPage.length}件欠落` : null,
-      rows: arr
-        .map((a, idx) => ({ a, idx }))
-        .filter(({ a }) => !a.page)
-        .map(({ a, idx }) => ({ idx, text: articleLabel(a, idx), fieldKey: 'page', fieldLabel: 'ページ番号' })),
-    });
+    checks.push({ label: 'ページ番号 全件記載', ok: noPage.length === 0, detail: noPage.length > 0 ? `${noPage.length}件欠落` : null });
 
     // Check 3: Page coverage
     const pages = new Set(arr.map(a => a.page).filter(Boolean));
@@ -4034,9 +4112,8 @@ function runValidation() {
 
   // Check 4: Required fields
   state.schema.fields.filter(f => f.required).forEach(f => {
-    const rows = missingRowsFor(f);
-    const missing = rows.length;
-    checks.push({ label: `${f.label} 全件記載`, ok: missing === 0, detail: missing > 0 ? `${missing}件欠落` : null, rows, fieldKey: f.key, fieldLabel: f.label });
+    const missing = arr.filter(a => a[f.key] === undefined || a[f.key] === null || a[f.key] === '').length;
+    checks.push({ label: `${f.label} 全件記載`, ok: missing === 0, detail: missing > 0 ? `${missing}件欠落` : null });
   });
 
   // Check 5: Item density (only meaningful with page field)
@@ -4049,9 +4126,8 @@ function runValidation() {
   // Check 6: Enrichment fields when requested
   if (state.schema.enrichFields && state.schema.enrichFields.length > 0 && $('enrichFM').checked) {
     state.schema.enrichFields.forEach(f => {
-      const rows = missingRowsFor(f);
-      const missing = rows.length;
-      checks.push({ label: `${f.label} 全件記載`, ok: missing === 0, detail: missing > 0 ? `${missing}件欠落` : null, rows, fieldKey: f.key, fieldLabel: f.label });
+      const missing = arr.filter(a => a[f.key] === undefined || a[f.key] === null || a[f.key] === '').length;
+      checks.push({ label: `${f.label} 全件記載`, ok: missing === 0, detail: missing > 0 ? `${missing}件欠落` : null });
     });
   }
 
@@ -4069,87 +4145,11 @@ function runValidation() {
 
   const failed = checks.filter(c => !c.ok);
   if (failed.length > 0) {
-    const repairableRows = failed.flatMap(c => (c.rows || []).map(r => ({
-      idx: r.idx,
-      fieldKey: c.fieldKey || r.fieldKey || '',
-      fieldLabel: c.fieldLabel || r.fieldLabel || c.label.replace(/\s*全件記載$/, ''),
-      text: r.text || String(r),
-    }))).filter(r => r.fieldKey);
     $('vIssues').classList.remove('hidden');
     $('vIssues').innerHTML = `
       <strong>要確認項目があります:</strong>
-      ${repairableRows.length ? `<div>
-        <button type="button" class="v-repair-all" id="autoRepairMissingFields">欠落項目を自動補修</button>
-        <button type="button" class="v-repair-btn" id="repairMissingAll">候補を確認しながら補修</button>
-      </div>` : ''}
-      <ul>${failed.map(c => {
-        const rowList = (c.rows || []).slice(0, 10);
-        const more = (c.rows || []).length > 10 ? `<li>...ほか${c.rows.length - 10}件</li>` : '';
-        return `<li>${c.label}${c.detail ? ` (${c.detail})` : ''}${rowList.length ? `<ul class="v-issue-details">${rowList.map(r => {
-          const fieldKey = c.fieldKey || r.fieldKey || '';
-          const fieldLabel = c.fieldLabel || r.fieldLabel || c.label.replace(/\s*全件記載$/, '');
-          const suggestion = fieldKey ? buildMissingFieldSuggestion(state.articles[r.idx] || {}, fieldKey, fieldLabel) : '';
-          const suggestionHtml = suggestion ? `<div style="font-size:11px;color:var(--gray);margin:2px 0 4px;">候補: ${escapeHtml(suggestion)}</div>` : '';
-          const repair = fieldKey ? `<button type="button" class="v-repair-btn" data-repair-field="${escapeHtml(fieldKey)}" data-repair-label="${escapeHtml(fieldLabel)}" data-repair-index="${r.idx}">手入力で補修</button>` : '';
-          return `<li>${escapeHtml(r.text || r)}${suggestionHtml}${repair}</li>`;
-        }).join('')}${more}</ul>` : ''}</li>`;
-      }).join('')}</ul>
+      <ul>${failed.map(c => `<li>${c.label}${c.detail ? ` (${c.detail})` : ''}</li>`).join('')}</ul>
     `;
-    const applySuggestion = (row) => {
-      const target = state.articles[row.idx];
-      if (!target || !row.fieldKey) return false;
-      const value = buildMissingFieldSuggestion(target, row.fieldKey, row.fieldLabel).trim();
-      if (!value) return false;
-      target[row.fieldKey] = row.fieldKey === 'page' ? (coerceInteger(value) || value) : value;
-      return true;
-    };
-    const repairOne = async (idx, key, label) => {
-      const target = state.articles[idx];
-      if (!target || !key) return false;
-      const suggestion = buildMissingFieldSuggestion(target, key, label);
-      const current = target[key] === undefined || target[key] === null || target[key] === '' ? suggestion : String(target[key]);
-      const value = prompt(`${label}を入力してください\n${articleLabel(target, idx)}`, current);
-      if (value === null) return false;
-      const trimmed = value.trim();
-      if (!trimmed) {
-        alert('空欄のままでは補修できません。');
-        return false;
-      }
-      target[key] = key === 'page' ? (coerceInteger(trimmed) || trimmed) : trimmed;
-      await saveSession();
-      runValidation();
-      renderResults();
-      log(`✓ ${articleLabel(target, idx)} の「${label}」を手入力で補修しました`, 'ok');
-      return true;
-    };
-    const autoRepair = $('autoRepairMissingFields');
-    if (autoRepair) {
-      autoRepair.addEventListener('click', async () => {
-        let count = 0;
-        repairableRows.forEach(row => { if (applySuggestion(row)) count++; });
-        await saveSession();
-        runValidation();
-        renderResults();
-        log(`✓ 欠落項目 ${count}件を自動補修しました`, 'ok');
-      });
-    }
-    const repairAll = $('repairMissingAll');
-    if (repairAll) {
-      repairAll.addEventListener('click', async () => {
-        for (const row of repairableRows) {
-          const ok = await repairOne(row.idx, row.fieldKey, row.fieldLabel);
-          if (!ok) break;
-        }
-      });
-    }
-    $('vIssues').querySelectorAll('.v-repair-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const idx = parseInt(btn.dataset.repairIndex, 10);
-        const key = btn.dataset.repairField;
-        const label = btn.dataset.repairLabel || key;
-        await repairOne(idx, key, label);
-      });
-    });
   } else {
     $('vIssues').classList.add('hidden');
   }
@@ -4250,24 +4250,12 @@ function buildExportRows() {
   });
 }
 
-function describeArticleForIssue(a, idx) {
-  const no = a.no || (idx + 1);
-  const page = a.page ? `P${a.page}` : 'P?';
-  const headline = String(a.headline || a.title || '').trim();
-  return `No.${no} / ${page}${headline ? ` / ${headline.slice(0, 60)}` : ''}`;
-}
-
 function getMissingEnrichSummary() {
   const enrichFields = state.schema.enrichFields || [];
   if (enrichFields.length === 0 || !$('enrichFM')?.checked) return null;
   const missing = enrichFields.map(f => ({
     label: f.label,
     count: state.articles.filter(a => a[f.key] === undefined || a[f.key] === null || a[f.key] === '').length,
-    examples: state.articles
-      .map((a, idx) => ({ a, idx }))
-      .filter(({ a }) => a[f.key] === undefined || a[f.key] === null || a[f.key] === '')
-      .slice(0, 5)
-      .map(({ a, idx }) => describeArticleForIssue(a, idx)),
   })).filter(x => x.count > 0);
   if (missing.length === 0) return null;
   return {
@@ -4279,10 +4267,7 @@ function getMissingEnrichSummary() {
 function blockExportIfEnrichMissing(formatLabel) {
   const summary = getMissingEnrichSummary();
   if (!summary) return false;
-  const lines = summary.missing.slice(0, 8).map(x => {
-    const examples = x.examples.length > 0 ? `\n  ${x.examples.join('\n  ')}` : '';
-    return `・${x.label}: ${x.count}件欠落${examples}`;
-  }).join('\n');
+  const lines = summary.missing.slice(0, 8).map(x => `・${x.label}: ${x.count}件欠落`).join('\n');
   alert(
     `${formatLabel}出力を停止しました。\n\n` +
     `F〜M列がまだ生成されていない、または一部欠落しています。\n` +
@@ -4458,96 +4443,12 @@ $('exportJson').addEventListener('click', () => {
   download(JSON.stringify(state.articles, null, 2), 'application/json', '.json');
 });
 
-function buildGenreBriefingPrompt(sourceRows, sourceLabel = '抽出結果'){
-  const rows = (sourceRows || []).map(normalizeArticleRecord).filter(a =>
-    a.headline || a.title || a['見出し'] || a.content_detail || a['内容'] || a['内容・詳細']
-  );
-  if(!rows.length) throw new Error('総括プロンプトを作る記事データがありません');
-  const compact = rows.map((a, idx) => ({
-    no: a.no || a.No || idx + 1,
-    genre: a.genre || a.cat || a.category || a['ジャンル'] || '',
-    category: a.category || a.cat || '',
-    page: a.page || a.men || a['PDFページ'] || '',
-    headline: a.headline || a.title || a['見出し'] || '',
-    content: a.content_detail || a['内容'] || a['内容・詳細'] || '',
-    intent: a.intent_motive || a['思惑'] || a['思惑と狙い/本音'] || '',
-    insight: a.key_insights || a['理解'] || a['理解すべき内容'] || '',
-    quiz_q: a.quiz_q || a['クイズ（問）'] || '',
-    quiz_a: a.quiz_a || a['クイズ（解）'] || '',
-  }));
-  const dateHint = $('mapDateInput') ? $('mapDateInput').value : '';
-  const edHint = $('mapEditionSelect') ? $('mapEditionSelect').value : '';
-  return `あなたは新聞を音声で学ぶ人のために、記事群を大ジャンルごとに総括する編集者です。
-以下の${sourceLabel}を読み、各記事の読み上げに入る前の「大ジャンル別読み上げコーナー」を作ってください。
-
-【目的】
-- 国際記事、国内記事、政治記事、地域記事、経済・金融、産業・企業、生活・社会、スポーツ、文化など、大ジャンルごとに先に全体像を説明する
-- 各記事を単独で読む前に、今日何を理解すべきか、誰が何を狙っているか、どの論点がつながっているかを整理する
-- 音声読み上げで自然に聞ける、少し知的で落ち着いた日本語にする
-
-【大ジャンル分類】
-記事の genre/category/cat を見て、次のいずれかに寄せてください。
-国際 / 政治 / 経済・金融 / 産業・企業 / 地域 / 生活・社会 / スポーツ / 文化・その他
-
-【出力JSONスキーマ】
-必ずJSON配列のみを返してください。説明文やMarkdownは禁止です。
-各要素は次の形にしてください。
-[
-  {
-    "genre": "国際",
-    "date": "${dateHint}",
-    "edition": "${edHint}",
-    "article_count": 0,
-    "title": "国際情勢の総括タイトル",
-    "overview": "概要説明。180〜260字。記事群の全体像を一言でつかませる。",
-    "key_points": ["理解すべき内容1", "理解すべき内容2", "理解すべき内容3"],
-    "intent_motive": "思惑と狙い。180〜260字。政府・企業・投資家・地域社会などの本音を分析する。",
-    "reading_script": "読み上げ用本文。500〜800字。概要、理解ポイント、思惑、次に読むべき記事の順序を自然につなげる。",
-    "quiz_q": "総括理解度クイズを1問",
-    "quiz_a": "正解",
-    "priority_headlines": ["先に読むべき記事見出し1", "先に読むべき記事見出し2", "先に読むべき記事見出し3"]
-  }
-]
-
-【品質条件】
-- 記事が1本しかないジャンルでも出力する
-- 事実と推測を混ぜすぎない。推測は「狙い」「可能性」として表現する
-- 個別記事の本文を丸写しせず、ジャンル全体の構図に再編集する
-- クイズは細かい数字当てではなく、論点理解を確認する問いにする
-- reading_script はそのまま読み上げても不自然でない文章にする
-- 空欄、null、途中省略は禁止
-
-【入力記事JSON】
-${JSON.stringify(compact, null, 2)}`;
-}
-
-async function copyGenreBriefingPrompt(rows, sourceLabel){
-  try{
-    const promptText = buildGenreBriefingPrompt(rows, sourceLabel);
-    await copyText(promptText);
-    log(`📋 ${sourceLabel}から大ジャンル総括プロンプトをコピーしました`, 'ok');
-    alert('大ジャンル総括プロンプトをコピーしました。Geminiに貼り付けてください。');
-  }catch(err){
-    alert('総括プロンプトを作れません: ' + err.message);
-  }
-}
-
-if ($('copyGenreBriefPromptBtn')) {
-  $('copyGenreBriefPromptBtn').addEventListener('click', () => {
-    copyGenreBriefingPrompt(state.articles, '抽出結果');
-  });
-}
-if ($('copyMapGenreBriefPromptBtn')) {
-  $('copyMapGenreBriefPromptBtn').addEventListener('click', () => {
-    const rows = mapArticles.length ? mapArticles : buildMapRecordsFromCurrent();
-    copyGenreBriefingPrompt(rows, 'Map data.json');
-  });
-}
-
 // =====================================================================
 // Nikkei map data.json updater (merged from nikkei-updater)
 // =====================================================================
 let mapArticles = [];
+let mapDownloadFilename = 'data-1.json';
+const mapMergeSessionKeys = new Set();
 
 const MAP_ED_LABEL = {
   morning: '朝刊',
@@ -4624,12 +4525,38 @@ function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
     quiz_q: String(a.quiz_q || a['クイズ（問）'] || ''),
     quiz_a: String(a.quiz_a || a['クイズ（解）'] || ''),
     quiz_kaisetsu: String(a.keyword || a['キーワード解説'] || ''),
+    article_boxes: normalizeArticleBoxesValue(a.article_boxes || a.articleBoxes || a['記事位置'] || ''),
     '検索KW': '',
     kws: [],
     date: dateKey,
     edition,
     gid: `${dateKey}_${edition}_${no}`,
   };
+}
+
+function normalizeArticleBoxesValue(value) {
+  let candidates = [];
+  if (Array.isArray(value)) {
+    candidates = value.length === 4 && value.every(v => Number.isFinite(Number(v))) ? [value] : value;
+  } else {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (raw.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        candidates = parsed.length === 4 && parsed.every(v => Number.isFinite(Number(v))) ? [parsed] : parsed;
+      } catch {}
+    }
+    if (!candidates.length) candidates = raw.split(';').map(part => part.split(','));
+  }
+  return candidates.map(box => {
+    if (!Array.isArray(box) || box.length !== 4) return null;
+    const nums = box.map(v => Math.round(Number(v)));
+    if (nums.some(v => !Number.isFinite(v))) return null;
+    const [top, left, bottom, right] = nums.map(v => Math.max(0, Math.min(1000, v)));
+    if (bottom <= top || right <= left) return null;
+    return `${top},${left},${bottom},${right}`;
+  }).filter(Boolean).join(';');
 }
 
 function repairMapRecord(record, idx, fallbackDate = '', fallbackEdition = 'morning') {
@@ -4657,6 +4584,7 @@ function repairMapRecord(record, idx, fallbackDate = '', fallbackEdition = 'morn
   out.quiz_q = String(out.quiz_q || out['クイズ（問）'] || '');
   out.quiz_a = String(out.quiz_a || out['クイズ（解）'] || '');
   out.quiz_kaisetsu = String(out.quiz_kaisetsu || out.keyword || out['キーワード解説'] || '');
+  out.article_boxes = normalizeArticleBoxesValue(out.article_boxes || out.articleBoxes || out['記事位置'] || '');
   out['検索KW'] = String(out['検索KW'] || '');
   out.kws = Array.isArray(out.kws) ? out.kws : [];
   out.date = date;
@@ -4680,18 +4608,46 @@ function buildMapRecordsFromCurrent() {
 
 function mergeMapRecords(records) {
   if (!records.length) return 0;
-  const dates = new Set(records.map(a => a.date));
-  const editions = new Set(records.map(a => a.edition));
-  const before = mapArticles.length;
-  mapArticles = mapArticles.filter(a => !(dates.has(a.date) && editions.has(a.edition)));
-  const baseId = mapArticles.length > 0 ? Math.max(...mapArticles.map(a => parseInt(a.id, 10) || 0)) : 0;
-  records.forEach((a, idx) => { a.id = baseId + idx + 1; });
-  mapArticles = mapArticles.concat(records);
+  const grouped = new Map();
+  records.forEach(record => {
+    const key = `${record.date}|${record.edition}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(record);
+  });
+
+  let removed = 0;
+  grouped.forEach((incoming, key) => {
+    const [date, edition] = key.split('|');
+    const isTarget = article => article.date === date && article.edition === edition;
+    const existingTarget = mapArticles.filter(isTarget);
+    const others = mapArticles.filter(article => !isTarget(article));
+    const candidates = mapMergeSessionKeys.has(key) ? existingTarget.concat(incoming) : incoming;
+    if (!mapMergeSessionKeys.has(key)) removed += existingTarget.length;
+
+    const deduped = [];
+    const seen = new Set();
+    candidates.forEach((article, order) => {
+      const titleKey = String(article.title || '').replace(/\s+/g, '').toLowerCase();
+      const pageKey = String(article.men || '').match(/\d+/)?.[0] || '';
+      const identity = `${pageKey}|${titleKey}`;
+      if (seen.has(identity)) return;
+      seen.add(identity);
+      deduped.push({ article, order, page: parseInt(pageKey, 10) || 9999 });
+    });
+    deduped.sort((a, b) => a.page - b.page || a.order - b.order);
+    const target = deduped.map((entry, idx) => ({
+      ...entry.article,
+      no: idx + 1,
+      gid: `${date}_${edition}_${idx + 1}`,
+    }));
+    mapArticles = others.concat(target);
+    mapMergeSessionKeys.add(key);
+  });
   mapArticles = repairMapRecords(mapArticles);
-  return before - mapArticles.length;
+  return removed;
 }
 
-function downloadMapData(records, filename = 'data.json') {
+function downloadMapData(records, filename = mapDownloadFilename) {
   const blob = new Blob([JSON.stringify(records)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -4723,8 +4679,11 @@ $('loadMapJsonBtn').addEventListener('click', () => {
     try {
       const data = JSON.parse(await file.text());
       mapArticles = repairMapRecords(Array.isArray(data) ? data : (data.articles || []));
+      mapDownloadFilename = /\.json$/i.test(file.name) ? file.name : 'data-1.json';
+      mapMergeSessionKeys.clear();
       $('downloadMapJsonBtn').disabled = false;
-      mapLog(`既存data.jsonを読み込み: ${mapArticles.length}件`);
+      $('downloadMapJsonBtn').textContent = `${mapDownloadFilename}保存`;
+      mapLog(`${mapDownloadFilename}を読み込み: ${mapArticles.length}件`);
     } catch (err) {
       alert('JSONを読み込めません: ' + (err.message || err));
     }
@@ -4777,8 +4736,8 @@ $('deleteMapDateBtn').addEventListener('click', () => {
 
 $('downloadMapJsonBtn').addEventListener('click', () => {
   mapArticles = repairMapRecords(mapArticles);
-  downloadMapData(mapArticles);
-  mapLog(`data.jsonを保存: ${mapArticles.length}件`);
+  downloadMapData(mapArticles, mapDownloadFilename);
+  mapLog(`${mapDownloadFilename}を保存: ${mapArticles.length}件`);
 });
 
 if ($('mapDateInput') && !$('mapDateInput').value) {
@@ -4814,7 +4773,7 @@ function download(content, mime, ext) {
       itemsPerPage: preset.itemsPerPage || ITEMS_PER_PAGE_DEFAULT,
     };
     $('rolePrompt').value = saved.role || preset.role;
-    $('extractionRules').value = ensureOneLineLeadInstruction(saved.rules || preset.rules);
+    $('extractionRules').value = saved.rules || preset.rules;
     $('presetDesc').textContent = preset.description;
     if (state.schema.enrichFields && state.schema.enrichFields.length > 0) {
       $('enrichLabel').classList.remove('hidden');
@@ -4883,20 +4842,16 @@ function showRestoreBanner(session) {
       state.manual = {
         phase: session.manualPhase,
         index: session.manualIndex || 0,
-        batchSize: session.manualBatchSize || 10,
+        batchSize: session.manualBatchSize || 5,
         enrich: true,
         enrichBatchSize: 20,
       };
     }
-    runValidation();
     renderResults();
     $('resultsSection').classList.remove('hidden');
     $('resetBtn').classList.remove('hidden');
     banner.remove();
     log(`<strong>セッション復元</strong>: ${state.articles.length}件のデータを復元しました`, 'bold');
-    if (!$('validationSection').classList.contains('hidden')) {
-      $('validationSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
     if (!state.pdfDoc) {
       log(`⚠ PDFファイル本体は再アップロードが必要です（続きの抽出には必要、エクスポートは可能）`, 'warn');
     }
