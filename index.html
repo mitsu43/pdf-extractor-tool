@@ -80,6 +80,30 @@ h1 .accent { color: var(--red); }
   letter-spacing: 0.05em;
 }
 .meta-bar .dot { color: var(--red); margin: 0 8px; }
+.version-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+}
+.version-badge { font-weight: 700; color: var(--ink); }
+.version-status { color: #27633c; }
+.update-tool-btn {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  padding: 7px 12px;
+  border-radius: 3px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.update-tool-btn:hover { background: var(--paper-2); }
+.update-tool-btn:disabled { opacity: 0.55; cursor: wait; }
 
 /* ============ Sections ============ */
 section { margin-bottom: 28px; }
@@ -588,6 +612,11 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <span>カスタム抽出スキーマ <span class="dot">·</span> Gemini API連携 <span class="dot">·</span> リアルタイムコスト試算</span>
     <span id="todayDate"></span>
   </div>
+  <div class="version-tools" aria-label="ツールのバージョン情報">
+    <span class="version-badge" id="appVersion"></span>
+    <span class="version-status" id="versionStatus">最新版を表示中</span>
+    <button type="button" class="update-tool-btn" id="updateToolBtn">最新版に更新</button>
+  </div>
 </header>
 
 <!-- ============ Post-process existing files (cleanup tool) ============ -->
@@ -1008,6 +1037,9 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
+const APP_VERSION = 'v2026.09.09.2';
+const APP_VERSION_NAME = '解説イラスト対応版';
+
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
 // Free-tier limits as of May 2026: Gemini 1.x and 2.0 are SHUT DOWN.
@@ -1301,6 +1333,33 @@ const todayStr = () => {
   return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
 };
 $('todayDate').textContent = todayStr();
+document.getElementById('appVersion').textContent = `${APP_VERSION} ${APP_VERSION_NAME}`;
+
+const updateToolButton = document.getElementById('updateToolBtn');
+const versionStatus = document.getElementById('versionStatus');
+const updateQuery = new URLSearchParams(location.search).get('tool-update');
+if (updateQuery) {
+  versionStatus.textContent = `${APP_VERSION} へ更新済み`;
+}
+updateToolButton.addEventListener('click', async () => {
+  updateToolButton.disabled = true;
+  updateToolButton.textContent = '更新中...';
+  versionStatus.textContent = '最新版を読み込み中';
+
+  if ('serviceWorker' in navigator) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration => registration.update()));
+    } catch (error) {
+      console.warn('Service worker update check failed:', error);
+    }
+  }
+
+  const url = new URL(location.href);
+  url.search = '';
+  url.searchParams.set('tool-update', `${APP_VERSION}-${Date.now()}`);
+  location.replace(url.href);
+});
 
 // =====================================================================
 // SCHEMA: load / save / render
