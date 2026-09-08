@@ -522,6 +522,13 @@ table.results tr:hover td { background: #fdfaf1; }
 .detail-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; font-size: 12px; line-height: 1.7; }
 .detail-grid dt { font-weight: 700; color: var(--ink-soft); font-size: 11px; letter-spacing: 0.05em; }
 .detail-grid dd { color: var(--ink-soft); white-space: pre-wrap; }
+.result-article-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.result-article-actions .detail-toggle { margin-top: 0; }
+.article-illustration-btn { min-height: 34px; padding: 6px 10px; }
+.illustration-help { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--gray); font-size: 11px; line-height: 1.7; }
+@media (pointer: coarse) {
+  .article-illustration-btn { min-height: 44px; }
+}
 
 .map-update-panel { background: white; border: 1px solid var(--line); padding: 18px 20px; margin-top: 16px; font-family: 'Noto Sans JP', sans-serif; }
 .map-update-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
@@ -4190,6 +4197,69 @@ function getAllFields() {
   return base;
 }
 
+function firstArticleValue(article, keys) {
+  for (const key of keys) {
+    const value = article?.[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return '';
+}
+
+function promptValue(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function buildArticleIllustrationPrompt(article) {
+  const title = firstArticleValue(article, ['headline', 'title', '見出し', '記事タイトル']);
+  const genre = firstArticleValue(article, ['genre', 'category', 'ジャンル', 'カテゴリ']);
+  const content = firstArticleValue(article, ['content_detail', '内容・詳細', '記事内容要約', '内容', 'summary']);
+  const intent = firstArticleValue(article, ['intention', 'thoughts', '思惑と狙い/本音', '思惑と狙い', '思惑']);
+  const lesson = firstArticleValue(article, ['understanding', '理解すべき内容', '記者が伝えたいこと', 'reporter_message']);
+  const keyword = firstArticleValue(article, ['keyword', 'キーワード解説', 'keywords', '専門用語']);
+  const page = firstArticleValue(article, ['page', 'ページ']);
+
+  return `次の記事を、50歳前後の日本人がニュースを自分の生活に結び付けて理解できる、1枚の日本語解説イラストにしてください。
+
+【記事情報】
+タイトル: ${promptValue(title) || 'タイトル情報なし'}
+ジャンル: ${promptValue(genre) || '未分類'}
+PDFページ: ${promptValue(page) || '不明'}
+記事の要約: ${promptValue(content) || '要約情報なし'}
+背景・思惑: ${promptValue(intent) || '情報なし'}
+記者が伝えたいこと: ${promptValue(lesson) || '情報なし'}
+既存の用語解説: ${promptValue(keyword) || '情報なし'}
+
+【イラストの必須条件】
+1. 画像内の文章、見出し、注釈はすべて自然な日本語にする。
+2. 「何が起きたか」「なぜ重要か」「50歳前後の生活・仕事・家計にどう関係するか」「今後注目する点」を、短い説明と図で整理する。
+3. 記事に出る専門用語を1〜3語選び、「専門用語の説明」として、初めて聞く人にも分かる平易な日本語で意味を添える。略語は正式名称も示す。
+4. 子ども向けにしすぎず、落ち着いたニュース解説の図解にする。人物、関係図、地図、金額や時系列など、内容に合う視覚表現を使う。
+5. スマートフォンでも読める大きさの文字にし、細かすぎる文章、過剰な装飾、無意味な余白を避ける。
+6. 「…」で文章を途中終了せず、すべての説明を完結させる。
+7. 記事情報にない数字・人物・因果関係を作らない。不明な点は「記事からは不明」と明記する。
+8. 横長16:9の1枚画像として生成する。回答は解説文だけで終わらせず、必ずイラスト画像を生成する。`;
+}
+
+async function openArticleIllustrationInGemini(articleIndex, button) {
+  const article = state.articles[articleIndex];
+  if (!article) return;
+  const prompt = buildArticleIllustrationPrompt(article);
+  const popup = window.open('https://gemini.google.com/app', `gemini_article_illustration_${Date.now()}`);
+  const copied = await copyPromptText(prompt, `記事${article.no || articleIndex + 1}の解説イラスト指示文をコピーしました`);
+  if (button && copied) {
+    const original = button.textContent;
+    button.textContent = 'コピー済み・Geminiへ';
+    setTimeout(() => { button.textContent = original; }, 2500);
+  }
+  if (!popup) {
+    alert('Geminiを開けませんでした。ブラウザでポップアップを許可してください。指示文はクリップボードにコピー済みです。');
+  } else if (!copied) {
+    alert('Geminiを開きましたが、指示文をコピーできませんでした。ブラウザのクリップボード許可を確認してください。');
+  }
+}
+
 function renderResults() {
   $('resultsSection').classList.remove('hidden');
   $('resultsCount').textContent = `${state.articles.length}件`;
@@ -4223,11 +4293,11 @@ function renderResults() {
       return `<td class="${cls}">${escapeHtml(text)}</td>`;
     }).join('');
 
-    let mainCellWithToggle = cellHtml;
-    if (detailFields.length > 0) {
-      // Append toggle to last cell
-      mainCellWithToggle = cellHtml.replace(/<\/td>$/, `<div class="detail-toggle" data-key="${rowKey}">＋ 詳細を見る</div></td>`);
-    }
+    const detailToggle = detailFields.length > 0
+      ? `<div class="detail-toggle" data-key="${rowKey}">＋ 詳細を見る</div>`
+      : '';
+    const articleActions = `<div class="result-article-actions">${detailToggle}<button type="button" class="btn btn-secondary btn-sm article-illustration-btn" data-article-index="${idx}" title="記事内容を50歳前後向けの日本語解説イラストにする指示文をコピーしてGeminiを開く">解説イラスト</button></div>`;
+    const mainCellWithToggle = cellHtml.replace(/<\/td>$/, `${articleActions}</td>`);
 
     const detailRow = detailFields.length > 0 ? `
       <tr class="detail-row" id="detail-${rowKey}">
@@ -4235,6 +4305,7 @@ function renderResults() {
           <dl class="detail-grid">
             ${detailFields.map(f => `<dt>${escapeHtml(f.label)}</dt><dd>${escapeHtml(String(a[f.key] ?? ''))}</dd>`).join('')}
           </dl>
+          <div class="illustration-help">「解説イラスト」を押すと専用指示文をコピーしてGeminiを開きます。Geminiの入力欄に貼り付けて送信してください。</div>
         </td>
       </tr>` : '';
     return `<tr>${mainCellWithToggle}</tr>${detailRow}`;
@@ -4245,6 +4316,11 @@ function renderResults() {
       const k = e.target.dataset.key;
       const dr = document.getElementById(`detail-${k}`);
       if (dr) dr.classList.toggle('open');
+    });
+  });
+  body.querySelectorAll('.article-illustration-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      openArticleIllustrationInGemini(Number(button.dataset.articleIndex), button);
     });
   });
   if (typeof updateMapIoStatus === 'function') updateMapIoStatus();
