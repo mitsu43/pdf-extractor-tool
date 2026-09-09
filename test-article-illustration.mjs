@@ -41,7 +41,9 @@ const prompt = context.buildArticleIllustrationPrompt({
 assert.match(html, /class="btn btn-secondary btn-sm article-illustration-btn"/);
 assert.match(html, /openArticleIllustrationInGemini\(Number\(button\.dataset\.articleIndex\), button\)/);
 assert.match(prompt, /金利上昇で住宅ローンに変化/);
-assert.match(prompt, /50歳前後の生活・仕事・家計/);
+assert.match(prompt, /高校生でも内容を理解でき/);
+assert.match(prompt, /50代の生活・仕事・家計にどう役立つか/);
+assert.match(prompt, /高校生が初めて聞いても分かる/);
 assert.match(prompt, /専門用語の説明/);
 assert.match(prompt, /スマートフォンでも読める/);
 assert.match(prompt, /「…」で文章を途中終了せず/);
