@@ -550,8 +550,17 @@ table.results tr:hover td { background: #fdfaf1; }
 .result-article-actions .detail-toggle { margin-top: 0; }
 .article-illustration-btn { min-height: 34px; padding: 6px 10px; }
 .illustration-help { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--gray); font-size: 11px; line-height: 1.7; }
+.page-illustration-panel { padding: 14px 20px; background: var(--paper-2); border-bottom: 1px solid var(--line); }
+.page-illustration-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.page-illustration-head strong { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; }
+.page-illustration-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 3px; }
+.page-illustration-card { flex: 0 0 min(300px, 82vw); background: white; padding: 10px 12px; border: 1px solid var(--line-soft); }
+.page-illustration-card-title { font: 700 12px 'Noto Sans JP', sans-serif; margin-bottom: 4px; }
+.page-illustration-card-note { color: var(--gray); font: 11px/1.5 'Noto Sans JP', sans-serif; margin-bottom: 8px; }
+.page-illustration-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.page-illustration-ready { color: var(--ok); font-weight: 700; }
 @media (pointer: coarse) {
-  .article-illustration-btn { min-height: 44px; }
+  .article-illustration-btn, .page-illustration-actions .btn { min-height: 44px; }
 }
 
 .map-update-panel { background: white; border: 1px solid var(--line); padding: 18px 20px; margin-top: 16px; font-family: 'Noto Sans JP', sans-serif; }
@@ -965,6 +974,14 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <button class="btn btn-secondary btn-sm" id="exportMapJson">Map data.json</button>
       </div>
     </div>
+    <div class="page-illustration-panel" id="pageIllustrationPanel">
+      <div class="page-illustration-head">
+        <div><strong>面単位の解説イラスト</strong><span class="results-count" id="pageIllustrationCount">0面</span></div>
+        <button class="btn btn-secondary btn-sm" id="exportPageIllustrationPack" disabled>マップ登録用画像パック保存</button>
+      </div>
+      <div class="page-illustration-list" id="pageIllustrationList"></div>
+      <div class="illustration-help">各面の「Geminiで生成」で指示文をコピーし、生成画像を端末へ保存後、「画像を選択」で登録してください。最後に画像パックを保存し、記事マップの「面サマリ」から読み込みます。</div>
+    </div>
     <div class="results-body">
       <table class="results" id="resultsTable">
         <thead id="resultsHead"></thead>
@@ -1037,8 +1054,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.09.09.2';
-const APP_VERSION_NAME = '解説イラスト対応版';
+const APP_VERSION = 'v2026.09.09.4';
+const APP_VERSION_NAME = '高校生にもわかる解説イラスト版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -4279,7 +4296,7 @@ function buildArticleIllustrationPrompt(article) {
   const keyword = firstArticleValue(article, ['keyword', 'キーワード解説', 'keywords', '専門用語']);
   const page = firstArticleValue(article, ['page', 'ページ']);
 
-  return `次の記事を、50歳前後の日本人がニュースを自分の生活に結び付けて理解できる、1枚の日本語解説イラストにしてください。
+  return `次の記事を、高校生でも内容を理解でき、50代の日本人にも生活に役立つ、1枚の日本語解説イラストにしてください。
 
 【記事情報】
 タイトル: ${promptValue(title) || 'タイトル情報なし'}
@@ -4292,14 +4309,140 @@ PDFページ: ${promptValue(page) || '不明'}
 
 【イラストの必須条件】
 1. 画像内の文章、見出し、注釈はすべて自然な日本語にする。
-2. 「何が起きたか」「なぜ重要か」「50歳前後の生活・仕事・家計にどう関係するか」「今後注目する点」を、短い説明と図で整理する。
-3. 記事に出る専門用語を1〜3語選び、「専門用語の説明」として、初めて聞く人にも分かる平易な日本語で意味を添える。略語は正式名称も示す。
-4. 子ども向けにしすぎず、落ち着いたニュース解説の図解にする。人物、関係図、地図、金額や時系列など、内容に合う視覚表現を使う。
+2. 「何が起きたか」「なぜ重要か」「50代の生活・仕事・家計にどう役立つか」「今後注目する点」を、高校生でも理解できる短い説明と図で整理する。
+3. 記事に出る専門用語を1〜3語選び、「専門用語の説明」として、高校生が初めて聞いても分かる平易な日本語で意味を添える。略語は正式名称も示す。
+4. 高校生向けの教科書程度の分かりやすさと、落ち着いたニュース解説の見た目を両立する。人物、関係図、地図、金額や時系列など、内容に合う視覚表現を使う。
 5. スマートフォンでも読める大きさの文字にし、細かすぎる文章、過剰な装飾、無意味な余白を避ける。
 6. 「…」で文章を途中終了せず、すべての説明を完結させる。
 7. 記事情報にない数字・人物・因果関係を作らない。不明な点は「記事からは不明」と明記する。
 8. 横長16:9の1枚画像として生成する。回答は解説文だけで終わらせず、必ずイラスト画像を生成する。`;
 }
+
+const pageIllustrationImages = new Map();
+
+function pageIllustrationPage(article) {
+  const raw = firstArticleValue(article, ['page', 'PDFページ', 'men', 'printedPage', 'ページ']);
+  const match = String(raw || '').match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+function pageIllustrationGroups() {
+  const groups = new Map();
+  state.articles.forEach(article => {
+    const page = pageIllustrationPage(article);
+    if (!Number.isFinite(page)) return;
+    if (!groups.has(page)) groups.set(page, []);
+    groups.get(page).push(article);
+  });
+  return [...groups.entries()].sort((a, b) => a[0] - b[0]);
+}
+
+function pageIllustrationSummary(article) {
+  const title = promptValue(firstArticleValue(article, ['headline', 'title', '見出し', '記事タイトル']));
+  const detail = promptValue(firstArticleValue(article, ['content_detail', '内容・詳細', '記事内容要約', '内容', 'summary']));
+  return `・${title || '見出しなし'}${detail ? `: ${detail}` : ''}`;
+}
+
+function buildPageIllustrationPrompt(page, articles) {
+  const articleText = (articles || []).map(pageIllustrationSummary).join('\n');
+  return `新聞の${page}面全体を、高校生でも理解でき、50代の日本人にも生活に役立つ、1枚の日本語解説イラストにしてください。
+
+【${page}面の記事】
+${articleText || '記事情報なし'}
+
+【イラストの必須条件】
+1. 個々の記事をばらばらに描くだけでなく、この面で重要な論点と記事同士のつながりが一目で分かる構成にする。
+2. 各記事は、短い見出しと完結した1文で要約する。「…」で文章を途中終了しない。
+3. 「この面で最も重要なこと」「なぜ重要か」「50代の生活・仕事・家計にどう役立つか」「今後注目する点」を明示する。
+4. 専門用語を1〜3語選び、高校生が初めて聞いても分かる平易な日本語で説明する。略語は正式名称も示す。
+5. 画像内の文章、見出し、注釈はすべて自然な日本語にする。スマートフォンでも読める文字サイズにする。
+6. 記事情報にない数字・人物・因果関係を作らない。不明な点は「記事からは不明」と明記する。
+7. 落ち着いたニュース図解として、関係図、地図、金額、時系列など内容に合う視覚表現を使う。
+8. 横長16:9の1枚画像として生成する。回答は解説文だけで終わらせず、必ずイラスト画像を生成する。`;
+}
+
+async function openPageIllustrationInGemini(page, button) {
+  const group = pageIllustrationGroups().find(([value]) => value === page);
+  if (!group) return;
+  const prompt = buildPageIllustrationPrompt(page, group[1]);
+  const popup = window.open('https://gemini.google.com/app', `gemini_page_illustration_${page}_${Date.now()}`);
+  const copied = await copyPromptText(prompt, `${page}面の解説イラスト指示文をコピーしました`);
+  if (button && copied) {
+    const original = button.textContent;
+    button.textContent = 'コピー済み・Geminiへ';
+    setTimeout(() => { button.textContent = original; }, 2500);
+  }
+  if (!popup) alert('Geminiを開けませんでした。ポップアップを許可してください。指示文はコピー済みです。');
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('画像を読み込めません'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function registerPageIllustrationImage(page, file) {
+  if (!file || !String(file.type || '').startsWith('image/')) {
+    alert('画像ファイルを選択してください');
+    return;
+  }
+  const dataUrl = await fileToDataUrl(file);
+  if (!dataUrl.startsWith('data:image/')) throw new Error('画像データを読み込めません');
+  pageIllustrationImages.set(page, { fileName: file.name, mimeType: file.type || 'image/png', dataUrl });
+  renderPageIllustrationTools();
+}
+
+function renderPageIllustrationTools() {
+  const list = $('pageIllustrationList');
+  if (!list) return;
+  const groups = pageIllustrationGroups();
+  $('pageIllustrationCount').textContent = `${groups.length}面`;
+  list.innerHTML = groups.map(([page, articles]) => {
+    const image = pageIllustrationImages.get(page);
+    return `<div class="page-illustration-card" data-page="${page}">
+      <div class="page-illustration-card-title">${page}面</div>
+      <div class="page-illustration-card-note">${articles.length}記事${image ? ` / <span class="page-illustration-ready">画像登録済み: ${escapeHtml(image.fileName)}</span>` : ' / 画像未登録'}</div>
+      <div class="page-illustration-actions">
+        <button type="button" class="btn btn-secondary btn-sm page-illustration-generate" data-page="${page}">Geminiで生成</button>
+        <button type="button" class="btn btn-secondary btn-sm page-illustration-select" data-page="${page}">${image ? '画像を変更' : '画像を選択'}</button>
+        <input type="file" class="page-illustration-file" data-page="${page}" accept="image/png,image/jpeg,image/webp" hidden>
+      </div>
+    </div>`;
+  }).join('') || '<div class="page-illustration-card-note">面情報を含む記事がありません。</div>';
+  list.querySelectorAll('.page-illustration-generate').forEach(button => button.addEventListener('click', () => openPageIllustrationInGemini(Number(button.dataset.page), button)));
+  list.querySelectorAll('.page-illustration-select').forEach(button => button.addEventListener('click', () => list.querySelector(`.page-illustration-file[data-page="${button.dataset.page}"]`)?.click()));
+  list.querySelectorAll('.page-illustration-file').forEach(input => input.addEventListener('change', async () => {
+    try { await registerPageIllustrationImage(Number(input.dataset.page), input.files?.[0]); }
+    catch (error) { alert(error.message || error); }
+  }));
+  const exportButton = $('exportPageIllustrationPack');
+  if (exportButton) exportButton.disabled = pageIllustrationImages.size === 0;
+}
+
+function exportPageIllustrationPack() {
+  const date = mapDateKey($('mapDateInput')?.value);
+  if (!date) { alert('日経マップ更新欄で日付を指定してください'); return; }
+  const edition = $('mapEditionSelect')?.value || 'morning';
+  const items = [...pageIllustrationImages.entries()].sort((a, b) => a[0] - b[0]).map(([page, image]) => ({
+    date, edition, page, fileName: image.fileName, mimeType: image.mimeType, dataUrl: image.dataUrl, createdAt: new Date().toISOString()
+  }));
+  if (!items.length) { alert('面画像を1枚以上選択してください'); return; }
+  const payload = { format: 'nikkei-map-page-summary-images-v1', version: 1, items };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `page-summary-images-${date.replace('/', '-')}-${edition}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+$('exportPageIllustrationPack').addEventListener('click', exportPageIllustrationPack);
 
 async function openArticleIllustrationInGemini(articleIndex, button) {
   const article = state.articles[articleIndex];
@@ -4355,7 +4498,7 @@ function renderResults() {
     const detailToggle = detailFields.length > 0
       ? `<div class="detail-toggle" data-key="${rowKey}">＋ 詳細を見る</div>`
       : '';
-    const articleActions = `<div class="result-article-actions">${detailToggle}<button type="button" class="btn btn-secondary btn-sm article-illustration-btn" data-article-index="${idx}" title="記事内容を50歳前後向けの日本語解説イラストにする指示文をコピーしてGeminiを開く">解説イラスト</button></div>`;
+    const articleActions = `<div class="result-article-actions">${detailToggle}<button type="button" class="btn btn-secondary btn-sm article-illustration-btn" data-article-index="${idx}" title="記事内容を高校生にも分かりやすく、50代にも役立つ日本語解説イラストにする指示文をコピーしてGeminiを開く">解説イラスト</button></div>`;
     const mainCellWithToggle = cellHtml.replace(/<\/td>$/, `${articleActions}</td>`);
 
     const detailRow = detailFields.length > 0 ? `
@@ -4382,6 +4525,7 @@ function renderResults() {
       openArticleIllustrationInGemini(Number(button.dataset.articleIndex), button);
     });
   });
+  renderPageIllustrationTools();
   if (typeof updateMapIoStatus === 'function') updateMapIoStatus();
 }
 
