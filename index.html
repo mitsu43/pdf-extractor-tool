@@ -642,8 +642,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>実行モード</label>
       <select id="runMode">
-        <option value="manual" selected>Gemini手動相談（API課金なし）</option>
-        <option value="api">Gemini API自動</option>
+        <option value="api" selected>Gemini API自動（推奨）</option>
+        <option value="manual">Gemini手動相談</option>
       </select>
       <span class="desc">手動相談は、このツールで指示文を作り、Geminiブラウザに貼ってJSONを戻します。</span>
     </div>
@@ -655,9 +655,9 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>モデル</label>
       <select id="model">
-        <option value="gemini-2.5-pro">gemini-2.5-pro (高精度 / 無料枠 100回/日)</option>
+        <option value="gemini-2.5-pro" selected>gemini-2.5-pro (高精度 / 無料枠 100回/日)</option>
         <option value="gemini-2.5-flash">gemini-2.5-flash (中精度 / 無料枠 250回/日)</option>
-        <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (推奨・最安 / 無料枠 1000回/日)</option>
+        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (最安 / 無料枠 1000回/日)</option>
       </select>
       <span class="desc">コスト試算と実行で使用。</span>
     </div>
@@ -761,8 +761,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
   <div class="form-grid three">
     <div class="field">
       <label>分割バッチサイズ (ページ)</label>
-      <input type="number" id="batchSize" value="5" min="2" max="30">
-      <span class="desc"><strong>2以上推奨</strong>。濃い内容(法律書等)は5前後、新聞は10以上が目安。切れたら自動で半分に分割します。</span>
+      <input type="number" id="batchSize" value="5" min="2" max="5">
+      <span class="desc"><strong>新聞は最大5ページに固定</strong>。出力が切れた場合は自動でさらに分割します。</span>
     </div>
     <div class="field">
       <label>呼出間隔（秒）</label>
@@ -781,12 +781,16 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
       <span><strong>無料枠セーフモード</strong>（モデル別RPMに合わせて自動で呼出間隔を調整）</span>
     </label>
     <label class="checkbox">
-      <input type="checkbox" id="strictMode">
-      <span>厳格モード（検証警告をログに表示）</span>
+      <input type="checkbox" id="strictMode" checked>
+      <span>厳格モード（不備のあるバッチを自動再試行）</span>
     </label>
     <label class="checkbox" id="enrichLabel">
       <input type="checkbox" id="enrichFM" checked>
       <span id="enrichLabelText">深掘り分析を実施（プリセットが定義されている場合）</span>
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="autoFinalize" checked>
+      <span><strong>自動運転</strong>（重複排除・検査合格後に本番用JSONを自動保存）</span>
     </label>
   </div>
 
@@ -1037,8 +1041,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.09.09.5';
-const APP_VERSION_NAME = '記事解説イラスト版';
+const APP_VERSION = 'v2026.09.17.1';
+const APP_VERSION_NAME = '5ページ自動運転版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -2167,6 +2171,11 @@ async function handleFile(file) {
     alert('PDFファイルを選択してください');
     return;
   }
+  const nikkeiLike = /^\d{8}[merp]\.pdf$/i.test(file.name);
+  if (state.preset === 'nikkei' && !nikkeiLike) {
+    alert('日経新聞PDFのファイル名は、日本時間の日付8桁 + 版種で指定してください。\n例: 20260917m.pdf / 20260917e.pdf / 20260917r.pdf');
+    return;
+  }
   // Warn for very large PDFs (>30MB) — iPad Safari may struggle
   if (file.size > 30 * 1024 * 1024) {
     const sizeMB = (file.size / 1024 / 1024).toFixed(1);
@@ -2190,6 +2199,7 @@ async function handleFile(file) {
     return;
   }
   renderPdfInfo();
+  applyNikkeiFileMetadata(file.name);
   updateStartBtn();
   updateCostEstimate();
 }
@@ -2220,6 +2230,29 @@ function detectEdition(filename) {
   return '?';
 }
 
+function parseNikkeiFilename(filename) {
+  const match = String(filename || '').match(/^(\d{4})(\d{2})(\d{2})([merp])\.pdf$/i);
+  if (!match) return null;
+  const [, year, month, day, edition] = match;
+  const isoDate = `${year}-${month}-${day}`;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== Number(year)
+      || date.getUTCMonth() + 1 !== Number(month) || date.getUTCDate() !== Number(day)) return null;
+  return { isoDate, edition: edition.toLowerCase() };
+}
+
+function applyNikkeiFileMetadata(filename) {
+  const meta = parseNikkeiFilename(filename);
+  if (!meta) return false;
+  if ($('mapDateInput')) $('mapDateInput').value = meta.isoDate;
+  if ($('mapEditionSelect')) $('mapEditionSelect').value = MAP_ED_FROM_CODE[meta.edition];
+  if ($('batchSize')) {
+    $('batchSize').value = '5';
+    $('batchSize').max = '5';
+  }
+  return true;
+}
+
 // =====================================================================
 // Inputs / Start button
 // =====================================================================
@@ -2235,6 +2268,13 @@ function updateStartBtn() {
   $('testRunBtn').disabled = !ok || state.running;
 }
 $('runMode').addEventListener('change', updateStartBtn);
+$('batchSize').addEventListener('change', () => {
+  if (state.preset === 'nikkei' && Number($('batchSize').value) > 5) {
+    $('batchSize').value = '5';
+    log('新聞PDFは安全のため5ページ単位に自動修正しました', 'info');
+  }
+  updateCostEstimate();
+});
 $('resetBtn').addEventListener('click', () => {
   if (confirm('現在の作業データを破棄してリセットしますか？\n保存された前回データも消去されます。')) {
     clearSession().finally(() => location.reload());
@@ -3725,7 +3765,8 @@ async function runExtraction(opts = {}) {
   updateStartBtn();
 
   // Test mode: process only 1 page, batchSize=1
-  const userBatchSize = testOnly ? 1 : Math.max(2, parseInt($('batchSize').value) || 5);
+  const requestedBatchSize = Math.max(2, parseInt($('batchSize').value) || 5);
+  const userBatchSize = testOnly ? 1 : (state.preset === 'nikkei' ? Math.min(5, requestedBatchSize) : requestedBatchSize);
   const maxRetry = parseInt($('maxRetry').value) || 4;
   const enrich = state.schema.enrichFields && $('enrichFM').checked;
   const strict = $('strictMode').checked;
@@ -3818,7 +3859,12 @@ async function runExtraction(opts = {}) {
           try {
             const prompt = buildExtractionPrompt(startPage, endPage, startNo);
             const pages = range(startPage, endPage);
-            batch = await callGemini(prompt, extractionSchema, { pages });
+            const candidate = await callGemini(prompt, extractionSchema, { pages });
+            const qualityIssues = validateBatch(candidate, startNo, startPage, endPage);
+            if (strict && qualityIssues.length > 0) {
+              throw new Error(`品質検査不合格: ${qualityIssues.slice(0, 4).join(' / ')}`);
+            }
+            batch = candidate;
             break;
           } catch (err) {
             lastErr = err;
@@ -3896,6 +3942,13 @@ async function runExtraction(opts = {}) {
           }
         }
       }
+      if (state.preset === 'nikkei') {
+        const beforeDedup = state.articles.length;
+        state.articles = dedupeAndRenumberArticles(state.articles);
+        const removed = beforeDedup - state.articles.length;
+        log(`<strong>重複検査完了</strong>: ${removed}件を除外、${state.articles.length}件を採用`, removed > 0 ? 'warn' : 'ok');
+        await saveSession();
+      }
       log(`<strong>抽出フェーズ完了</strong>: 合計 ${state.articles.length}件`, 'bold');
     }
 
@@ -3919,7 +3972,12 @@ async function runExtraction(opts = {}) {
           try {
             const prompt = buildEnrichmentPrompt(slice, editionCode);
             const pages = slice.map(a => a.page).filter(Boolean);
-            enrichments = await callGemini(prompt, enrichSchema, { pages });
+            const candidate = await callGemini(prompt, enrichSchema, { pages });
+            const qualityIssues = validateEnrichmentBatch(candidate, slice);
+            if (strict && qualityIssues.length > 0) {
+              throw new Error(`深掘り品質検査不合格: ${qualityIssues.slice(0, 4).join(' / ')}`);
+            }
+            enrichments = candidate;
             break;
           } catch (err) {
             lastErr = err;
@@ -3961,7 +4019,7 @@ async function runExtraction(opts = {}) {
     }
 
     state.resume = null;
-    runValidation();
+    const validation = runValidation();
     renderResults();
     setStatus('完了');
     if (testOnly) {
@@ -3988,6 +4046,17 @@ async function runExtraction(opts = {}) {
       }, 300);
     } else {
       log(`<strong>全工程完了</strong> · ${state.articles.length}件抽出`, 'bold');
+      if ($('autoFinalize')?.checked) {
+        if (validation.allOk) {
+          const rows = buildMapRecordsFromCurrent();
+          const meta = parseNikkeiFilename(state.pdfFile?.name || '');
+          const filename = meta ? `${meta.isoDate.replaceAll('-', '')}${meta.edition}-data-1.json` : 'data-1.json';
+          downloadMapData(rows, filename);
+          log(`<strong>自動保存完了</strong>: ${filename} (${rows.length}件)`, 'ok');
+        } else {
+          log('<strong>自動保存を停止</strong>: 品質検査に未合格の項目があります', 'err');
+        }
+      }
     }
   } catch (err) {
     const stopped = err.message === 'STOPPED_BY_USER' || state.stopRequested;
@@ -4026,6 +4095,48 @@ function pageRangesFrom(startPage, total, batchSize) {
     p += batchSize;
   }
   return arr;
+}
+
+function normalizeDedupText(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s　「」『』【】（）()・,，.。:：;；!！?？\-—―]/g, '');
+}
+
+function dedupeAndRenumberArticles(records) {
+  const seen = new Set();
+  const deduped = [];
+  (records || []).forEach(record => {
+    const article = normalizeArticleRecord(record);
+    const headline = normalizeDedupText(article.headline || article.title || article['見出し']);
+    const detail = normalizeDedupText(article.content_detail || article['内容・詳細']).slice(0, 80);
+    const identity = headline || detail;
+    if (!identity || seen.has(identity)) return;
+    seen.add(identity);
+    deduped.push(article);
+  });
+  deduped.sort((a, b) => (Number(a.page) || 9999) - (Number(b.page) || 9999));
+  return deduped.map((article, index) => ({ ...article, no: index + 1 }));
+}
+
+function validateEnrichmentBatch(enrichments, sourceArticles) {
+  if (!Array.isArray(enrichments) || enrichments.length === 0) return ['深掘り結果が0件'];
+  const issues = [];
+  const byNo = new Map(enrichments.map(item => [Number(item.no), item]));
+  sourceArticles.forEach(article => {
+    const item = byNo.get(Number(article.no));
+    if (!item) {
+      issues.push(`No.${article.no}の深掘り結果が欠落`);
+      return;
+    }
+    (state.schema.enrichFields || []).forEach(field => {
+      if (item[field.key] === undefined || item[field.key] === null || item[field.key] === '') {
+        issues.push(`No.${article.no}: ${field.label}が空`);
+      }
+    });
+  });
+  return issues;
 }
 
 function shortErr(msg) {
@@ -4239,6 +4350,7 @@ function runValidation() {
   } else {
     $('vIssues').classList.add('hidden');
   }
+  return { allOk, checks };
 }
 
 // =====================================================================
