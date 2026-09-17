@@ -642,8 +642,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>実行モード</label>
       <select id="runMode">
-        <option value="api" selected>Gemini API自動（推奨）</option>
-        <option value="manual">Gemini手動相談</option>
+        <option value="manual" selected>Gemini手動連携（APIキー不要・推奨）</option>
+        <option value="api">Gemini API自動</option>
       </select>
       <span class="desc">手動相談は、このツールで指示文を作り、Geminiブラウザに貼ってJSONを戻します。</span>
     </div>
@@ -1041,8 +1041,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.09.17.1';
-const APP_VERSION_NAME = '5ページ自動運転版';
+const APP_VERSION = 'v2026.09.17.2';
+const APP_VERSION_NAME = 'APIキー不要・手動連携自動化版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -2202,6 +2202,9 @@ async function handleFile(file) {
   applyNikkeiFileMetadata(file.name);
   updateStartBtn();
   updateCostEstimate();
+  if ($('runMode').value === 'manual' && state.preset === 'nikkei') {
+    startManualWorkflow({ autoPrepare: true });
+  }
 }
 
 function renderPdfInfo() {
@@ -2974,11 +2977,13 @@ ${HIGH_SCHOOL_EXPLANATION_RULE}${locationGuide}${articleBoxesGuide}
 
 function startManualWorkflow(opts = {}) {
   const testOnly = !!opts.testOnly;
+  const autoPrepare = opts.autoPrepare !== false;
   ensureDefaultEnrichSetting();
   state.running = true;
   state.articles = [];
 
-  const batchSize = testOnly ? 1 : (parseInt($('batchSize').value) || 5);
+  const requestedBatchSize = parseInt($('batchSize').value) || 5;
+  const batchSize = testOnly ? 1 : Math.min(5, requestedBatchSize);
   const maxPages = testOnly ? 1 : state.pdfPageCount;
   // Build batch definitions
   const batches = [];
@@ -2999,7 +3004,8 @@ function startManualWorkflow(opts = {}) {
     maxPages,
     testOnly,
     batches,
-    prepared: false,
+    prepared: autoPrepare,
+    finalized: false,
   };
 
   logEl.innerHTML = '';
@@ -3013,9 +3019,10 @@ function startManualWorkflow(opts = {}) {
   } else {
     log(`<strong>並列手動相談モード開始</strong> · ${state.pdfFile.name} · ${state.pdfPageCount}ページ · ${batches.length}バッチ`, 'bold');
   }
-  // Render batch grid in initial pending state, but bulk-prep is needed to populate prompts/PDFs
+  // Prompts and split-PDF download actions are ready immediately after upload.
   renderBatchGrid();
-  $('manualStatus').textContent = `${batches.length}バッチ準備待ち`;
+  $('manualStatus').textContent = autoPrepare ? `${batches.length}バッチ準備完了` : `${batches.length}バッチ準備待ち`;
+  if (autoPrepare) log(`📦 全 ${batches.length} バッチを5ページ以下で自動準備しました`, 'ok');
 }
 
 // Render all batch tiles (called whenever state changes)
@@ -3106,7 +3113,7 @@ function updateOverallStatus() {
   const done = m.batches.filter(b => b.status === 'done').length;
   const err = m.batches.filter(b => b.status === 'error').length;
   const total = m.batches.length;
-  let status = `${done}/${total} 完了`;
+  let status = done === total ? `全${total}バッチ完了・自動検査中` : `${done}/${total} 完了`;
   if (err > 0) status += ` (${err}件エラー)`;
   $('manualStatus').textContent = status;
 }
@@ -3302,12 +3309,15 @@ function importBatchJson(batchId, text) {
     const trimmed = String(text).trim().replace(/```\s*$/i, '').trim();
     const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}'));
 
-    // Validate page numbers fall within this batch's range
-    let outOfRange = 0;
-    arr.forEach(a => {
-      const p = parseInt(a.page);
-      if (!isNaN(p) && (p < b.startPage || p > b.endPage)) outOfRange++;
-    });
+    const fieldsToValidate = state.schema.fields.concat(
+      $('enrichFM')?.checked ? (state.schema.enrichFields || []).map(field => ({ ...field, required: true })) : []
+    );
+    const provisionalStartNo = (batchId * m.batchSize * 5) + 1;
+    const issues = validateBatch(arr, provisionalStartNo, b.startPage, b.endPage, { fieldsToValidate });
+    if (issues.length > 0) {
+      const preview = issues.slice(0, 5).join(' / ');
+      throw new Error(`必須項目の不足: ${preview}${issues.length > 5 ? ` ほか${issues.length - 5}件` : ''}`);
+    }
 
     // Store articles attached to this batch
     b.articles = arr;
@@ -3315,13 +3325,14 @@ function importBatchJson(batchId, text) {
     b.status = wasTruncated ? 'error' : 'done';
     b.summary = wasTruncated
       ? `⚠ 途中で切断: ${arr.length}件を救出 (バッチ未完了)`
-      : `✓ ${arr.length}件取り込み${outOfRange > 0 ? ` (⚠ ${outOfRange}件のpageが範囲外)` : ''}`;
+      : `✓ ${arr.length}件取り込み・厳格検査合格`;
     log(`✓ バッチ${batchId+1} (P${b.startPage}〜P${b.endPage}): ${b.articleCount}件取り込み${wasTruncated ? ' (切断)' : ''}`, wasTruncated ? 'warn' : 'ok');
 
     // Merge all completed batches into state.articles
     mergeBatchArticles();
     renderBatchGrid();  // Re-render to update colors/icons
     saveSession();
+    if (!wasTruncated) completeManualWorkflowIfReady();
   } catch (err) {
     b.articles = null;
     b.articleCount = 0;
@@ -3362,13 +3373,45 @@ function mergeBatchArticles() {
   });
   // Sort: by batch id (which equals page order), then by within-batch order
   all.sort((a, b) => (a._batch - b._batch) || (a._order - b._order));
-  // Renumber no field sequentially
-  all.forEach((a, i) => {
-    if ('no' in a || hasNoField()) a.no = i + 1;
-    delete a._batch;
-    delete a._order;
+  const normalized = all.map(a => {
+    const article = { ...a };
+    delete article._batch;
+    delete article._order;
+    return article;
   });
-  state.articles = all;
+  state.articles = dedupeAndRenumberArticles(normalized);
+}
+
+async function completeManualWorkflowIfReady() {
+  const m = state.manual;
+  if (!m || m.finalized || !m.batches.length || !m.batches.every(batch => batch.status === 'done')) return;
+  m.finalized = true;
+  try {
+    state.articles = dedupeAndRenumberArticles(state.articles);
+    const validation = runValidation();
+    renderResults();
+    setStatus(validation.allOk ? '完了' : '要確認');
+    state.running = false;
+    updateStartBtn();
+    await saveSession();
+    $('manualStatus').textContent = validation.allOk ? '全バッチ完了・検査合格' : '全バッチ完了・要確認';
+    log(`<strong>手動連携の全工程完了</strong> · 重複整理後 ${state.articles.length}件`, 'bold');
+    if ($('autoFinalize')?.checked && validation.allOk && !m.testOnly) {
+      const rows = buildMapRecordsFromCurrent();
+      const meta = parseNikkeiFilename(state.pdfFile?.name || '');
+      const filename = meta ? `${meta.isoDate.replaceAll('-', '')}${meta.edition}-data-1.json` : 'data-1.json';
+      downloadMapData(rows, filename);
+      log(`<strong>本番用JSONを自動保存</strong>: ${filename} (${rows.length}件)`, 'ok');
+    } else if (!validation.allOk) {
+      log('<strong>自動保存を停止</strong>: 品質検査に未合格の項目があります', 'err');
+    }
+  } catch (err) {
+    m.finalized = false;
+    state.running = false;
+    updateStartBtn();
+    setStatus('完了処理エラー');
+    log(`完了処理エラー: ${err.message}`, 'err');
+  }
 }
 
 // Test compatibility shim: showManualStep is no longer used in parallel mode,
@@ -3702,7 +3745,13 @@ function finishManualWorkflow() {
 // API extraction workflow
 // =====================================================================
 $('startBtn').addEventListener('click', () => {
-  if ($('runMode').value === 'manual') startManualWorkflow();
+  if ($('runMode').value === 'manual') {
+    if (state.manual?.prepared) {
+      $('manualSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    startManualWorkflow({ autoPrepare: true });
+  }
   else runExtraction({ resume: false });
 });
 $('testRunBtn').addEventListener('click', async () => {

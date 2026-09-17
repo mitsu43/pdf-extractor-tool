@@ -56,10 +56,13 @@ const deduped = context.dedupeAndRenumberArticles([
 assert.equal(deduped.length, 2);
 assert.deepEqual(Array.from(deduped, article => article.no), [1, 2]);
 
-assert.match(html, /<option value="api" selected>Gemini API自動（推奨）<\/option>/);
+assert.match(html, /<option value="manual" selected>Gemini手動連携（APIキー不要・推奨）<\/option>/);
 assert.match(html, /id="batchSize" value="5" min="2" max="5"/);
 assert.match(html, /id="strictMode" checked/);
 assert.match(html, /id="autoFinalize" checked/);
 assert.match(html, /state\.preset === 'nikkei' \? Math\.min\(5, requestedBatchSize\)/);
+assert.match(html, /startManualWorkflow\(\{ autoPrepare: true \}\)/);
+assert.match(html, /completeManualWorkflowIfReady\(\)/);
+assert.match(html, /state\.articles = dedupeAndRenumberArticles\(normalized\)/);
 
 console.log('automatic workflow test: ok');
