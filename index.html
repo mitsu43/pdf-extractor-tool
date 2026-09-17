@@ -862,13 +862,15 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
       <!-- Bulk preparation section -->
       <div id="bulkPrepRow" style="background: rgba(184, 36, 42, 0.06); border: 1px solid #b8242a; border-left-width: 5px; padding: 14px 16px; margin-bottom: 16px;">
         <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; color: #14110d; margin-bottom: 6px;">
-          📦 まずは「全バッチを一括準備」をタップ
+          📦 PDF分割とGemini入力をまとめて準備
         </div>
         <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: #6b6359; line-height: 1.7; margin-bottom: 10px;" id="bulkPrepDesc">
-          バッチ数分の分割PDFと指示文を一気に用意します。準備後、各バッチをGeminiの別タブで並行処理し、戻ってきたJSONを各欄に貼ると自動取込されます。
+          「分割PDF一括」で全PDFを保存できます。Chrome拡張機能を入れると、バッチ数分のGeminiタブを開き、各タブへ対応する指示文を自動入力します。
         </div>
         <div class="action-row" style="justify-content:flex-start; gap: 8px; flex-wrap: wrap; margin: 0;">
           <button class="btn btn-primary btn-sm" id="bulkPrepBtn">📦 全バッチを一括準備</button>
+          <button class="btn btn-secondary btn-sm" id="downloadAllBatchPdfsBtn" disabled>📎 分割PDF一括</button>
+          <button class="btn btn-secondary btn-sm" id="extensionGeminiBtn" disabled>🧩 Geminiへ自動入力</button>
           <button class="btn btn-secondary btn-sm" id="openAllGeminiTabsBtn" disabled>🚀 Geminiタブ一括</button>
           <button class="btn btn-secondary btn-sm" id="copyAllBatchPromptsBtn" disabled>📋 全指示文コピー</button>
         </div>
@@ -1041,8 +1043,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.09.17.2';
-const APP_VERSION_NAME = 'APIキー不要・手動連携自動化版';
+const APP_VERSION = 'v2026.09.17.3';
+const APP_VERSION_NAME = 'Geminiタブ自動入力版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -3038,6 +3040,8 @@ function renderBatchGrid() {
   $('bulkPrepBtn').disabled = false;
   const openAllGeminiTabsBtn = $('openAllGeminiTabsBtn');
   const copyAllBatchPromptsBtn = $('copyAllBatchPromptsBtn');
+  const downloadAllBatchPdfsBtn = $('downloadAllBatchPdfsBtn');
+  const extensionGeminiBtn = $('extensionGeminiBtn');
   if (openAllGeminiTabsBtn) {
     openAllGeminiTabsBtn.textContent = prepared ? '🚀 Geminiタブ一括' : '🚀 準備してGemini一括';
     openAllGeminiTabsBtn.disabled = false;
@@ -3045,6 +3049,8 @@ function renderBatchGrid() {
   if (copyAllBatchPromptsBtn) {
     copyAllBatchPromptsBtn.disabled = !prepared;
   }
+  if (downloadAllBatchPdfsBtn) downloadAllBatchPdfsBtn.disabled = !prepared;
+  if (extensionGeminiBtn) extensionGeminiBtn.disabled = !prepared;
 
   // Build tiles HTML
   grid.innerHTML = m.batches.map(b => {
@@ -3130,6 +3136,8 @@ function debounce(fn, ms) {
 // "Bulk prepare" — initialize prompts for all batches (PDFs are generated on-demand per batch)
 $('openAllGeminiTabsBtn')?.addEventListener('click', openAllGeminiTabs);
 $('copyAllBatchPromptsBtn')?.addEventListener('click', copyAllBatchPrompts);
+$('downloadAllBatchPdfsBtn')?.addEventListener('click', downloadAllBatchPdfs);
+$('extensionGeminiBtn')?.addEventListener('click', openGeminiTabsWithExtension);
 
 $('bulkPrepBtn').addEventListener('click', async () => {
   const m = state.manual;
@@ -3244,6 +3252,53 @@ async function openAllGeminiTabs() {
   log(`🚀 Geminiタブ起動を ${opened}/${total} 件実行しました。バッチ1の指示文はコピー済みです`, opened ? 'ok' : 'warn');
   if (opened < total) {
     log('一部のタブが開かない場合は、ブラウザのポップアップ許可後に再度押してください', 'warn');
+  }
+}
+
+function openGeminiTabsWithExtension() {
+  const m = state.manual;
+  if (!ensureManualPrepared() || !m?.batches?.length) return;
+  const requestId = `gemini-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const batches = m.batches.map(batch => ({
+    id: batch.id,
+    label: `バッチ${batch.id + 1} P${batch.startPage}-${batch.endPage}`,
+    prompt: buildBatchPrompt(batch.id),
+  }));
+  let acknowledged = false;
+  const onMessage = event => {
+    if (event.source !== window || event.data?.source !== 'pdf-extractor-extension' || event.data?.requestId !== requestId) return;
+    acknowledged = true;
+    window.removeEventListener('message', onMessage);
+    log(`🧩 Gemini ${event.data.opened || batches.length}タブへ指示文を割り当てました`, 'ok');
+  };
+  window.addEventListener('message', onMessage);
+  window.postMessage({ source: 'pdf-extractor-tool', type: 'OPEN_GEMINI_BATCHES', requestId, batches }, '*');
+  setTimeout(() => {
+    window.removeEventListener('message', onMessage);
+    if (!acknowledged) alert('Chrome拡張機能が見つかりません。配布ZIP内の chrome-extension フォルダをChromeへ読み込んでください。');
+  }, 1800);
+}
+
+async function downloadAllBatchPdfs() {
+  const m = state.manual;
+  if (!ensureManualPrepared() || !m?.batches?.length) return;
+  const btn = $('downloadAllBatchPdfsBtn');
+  btn.disabled = true;
+  const original = btn.textContent;
+  let completed = 0;
+  try {
+    for (const batch of m.batches) {
+      btn.textContent = `PDF作成 ${completed + 1}/${m.batches.length}`;
+      await downloadBatchPdf(batch.id);
+      completed += 1;
+      await new Promise(resolve => setTimeout(resolve, 350));
+    }
+    log(`📎 分割PDF ${completed}ファイルを一括ダウンロードしました`, 'ok');
+  } catch (err) {
+    log(`分割PDF一括ダウンロード中断: ${err.message}`, 'err');
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
   }
 }
 

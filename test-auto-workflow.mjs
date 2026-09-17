@@ -64,5 +64,8 @@ assert.match(html, /state\.preset === 'nikkei' \? Math\.min\(5, requestedBatchSi
 assert.match(html, /startManualWorkflow\(\{ autoPrepare: true \}\)/);
 assert.match(html, /completeManualWorkflowIfReady\(\)/);
 assert.match(html, /state\.articles = dedupeAndRenumberArticles\(normalized\)/);
+assert.match(html, /id="downloadAllBatchPdfsBtn"/);
+assert.match(html, /id="extensionGeminiBtn"/);
+assert.match(html, /type: 'OPEN_GEMINI_BATCHES'/);
 
 console.log('automatic workflow test: ok');
