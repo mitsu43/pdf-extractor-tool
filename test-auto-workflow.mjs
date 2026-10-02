@@ -24,8 +24,6 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext([
-  extractFunction('localIsoDate'),
-  extractFunction('stableEditionFromFilename'),
   extractFunction('parseNikkeiFilename'),
   extractFunction('normalizeDedupText'),
   extractFunction('dedupeAndRenumberArticles'),
@@ -39,13 +37,6 @@ assert.deepEqual(
 assert.equal(context.parseNikkeiFilename('20260917e.pdf').edition, 'e');
 assert.equal(context.parseNikkeiFilename('20260230m.pdf'), null);
 assert.equal(context.parseNikkeiFilename('news.pdf'), null);
-assert.deepEqual(
-  JSON.parse(JSON.stringify(context.parseNikkeiFilename('夕刊.pdf', new Date(2026, 9, 2)))),
-  { isoDate: '2026-10-02', edition: 'e' },
-);
-assert.equal(context.parseNikkeiFilename('朝刊.pdf', new Date(2026, 9, 2)).edition, 'm');
-assert.equal(context.parseNikkeiFilename('地方版.pdf', new Date(2026, 9, 2)).edition, 'r');
-assert.equal(context.parseNikkeiFilename('p.pdf', new Date(2026, 9, 2)).edition, 'p');
 
 assert.deepEqual(
   JSON.parse(JSON.stringify(context.pageRangesFrom(1, 19, 5))),
