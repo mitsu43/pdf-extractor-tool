@@ -62,6 +62,8 @@ assert.match(publishScript, /width:1px;height:1px/);
 assert.match(publishScript, /function showBridgeSetup\(\)/);
 assert.match(publishScript, /if\(error\.status===401\)showBridgeSetup\(\)/);
 assert.doesNotMatch(publishScript, /bridgeFrame\.hidden=true/);
+assert.doesNotMatch(publishScript, /event\.source!==bridgeFrame/);
+assert.match(publishScript, /event\.origin!==MAP\|\|event\.data\?\.channel!==CHANNEL/);
 assert.doesNotMatch(publishScript, /popup=open/);
 assert.match(html, /manualState: state\.manual \? JSON\.parse\(JSON\.stringify\(state\.manual\)\) : null/);
 assert.match(html, /restoreSessionAfterPdfSelection\(state\.pendingRestoreSession\)/);

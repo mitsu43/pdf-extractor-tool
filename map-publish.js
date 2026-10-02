@@ -50,7 +50,7 @@
   }catch{}
 
   addEventListener('message',event=>{
-    if(event.origin!==MAP||event.source!==bridgeFrame?.contentWindow||event.data?.channel!==CHANNEL)return;
+    if(event.origin!==MAP||event.data?.channel!==CHANNEL)return;
     const call=calls.get(event.data.id);if(!call)return;
     calls.delete(event.data.id);clearTimeout(call.timer);
     if(event.data.error)call.reject(Object.assign(new Error(event.data.error),{status:event.data.status}));
