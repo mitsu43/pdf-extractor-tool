@@ -23,7 +23,7 @@
     <div class="map-update-log" id="publishStatus" role="status">抽出完了後、「更新内容を確認」を押してください。</div>`;
   const get=id=>document.getElementById(id);
   const say=text=>{get('publishStatus').textContent=text;};
-  let popup=null, preview=null, fingerprint='', busy=false;
+  let bridgeFrame=null, bridgeReady=null, preview=null, fingerprint='', busy=false;
   const calls=new Map();
 
   function activeMeta(){
@@ -50,7 +50,7 @@
   }catch{}
 
   addEventListener('message',event=>{
-    if(event.origin!==MAP||event.source!==popup||event.data?.channel!==CHANNEL)return;
+    if(event.origin!==MAP||event.source!==bridgeFrame?.contentWindow||event.data?.channel!==CHANNEL)return;
     const call=calls.get(event.data.id);if(!call)return;
     calls.delete(event.data.id);clearTimeout(call.timer);
     if(event.data.error)call.reject(Object.assign(new Error(event.data.error),{status:event.data.status}));
@@ -58,16 +58,26 @@
   });
 
   function rpc(action,body){return new Promise((resolve,reject)=>{
-    if(!popup||popup.closed)return reject(new Error('接続画面を開き直してください'));
+    if(!bridgeFrame?.contentWindow)return reject(new Error('日経マップへ接続できません'));
     const id=crypto.randomUUID();
     const timer=setTimeout(()=>{calls.delete(id);reject(new Error('接続画面から応答がありません。接続状態を確認してください。'));},60000);
     calls.set(id,{resolve,reject,timer});
-    popup.postMessage({channel:CHANNEL,id,action,body},MAP);
+    bridgeFrame.contentWindow.postMessage({channel:CHANNEL,id,action,body},MAP);
   });}
 
   function connect(){
-    if(!popup||popup.closed)popup=open(`${MAP}/article-import.html`,'nikkei-map-import');
-    return Boolean(popup);
+    if(bridgeFrame?.contentWindow&&bridgeReady)return bridgeReady;
+    bridgeFrame=document.createElement('iframe');
+    bridgeFrame.src=`${MAP}/article-import.html`;
+    bridgeFrame.title='日経マップ接続';
+    bridgeFrame.hidden=true;
+    bridgeReady=new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error('日経マップへの接続がタイムアウトしました')),15000);
+      bridgeFrame.onload=()=>{clearTimeout(timer);resolve(true);};
+      bridgeFrame.onerror=()=>{clearTimeout(timer);reject(new Error('日経マップへ接続できません'));};
+    });
+    document.body.appendChild(bridgeFrame);
+    return bridgeReady;
   }
 
   function input(){
@@ -94,9 +104,9 @@
   get('publishPreview').onclick=async()=>{
     if(busy)return;
     syncMeta();
-    if(!connect()){say('接続画面を開けません。ポップアップを許可してください。');return;}
     busy=true;get('publishCommit').disabled=true;say('更新内容を確認しています。');
     try{
+      await connect();
       const payload=input();
       fingerprint=await digest(payload);
       await rpc('ping',{});
@@ -109,9 +119,9 @@
 
   get('publishCommit').onclick=async()=>{
     if(busy||!preview)return;
-    if(!connect()){say('接続画面を開けません。');return;}
     busy=true;get('publishCommit').disabled=true;
     try{
+      await connect();
       if(!preview.sent&&await digest(input())!==fingerprint)throw Object.assign(new Error('確認後に内容が変わりました。更新内容を確認し直してください。'),{status:409});
       preview.sent=true;sessionStorage.setItem(SESSION_KEY,JSON.stringify({preview,fingerprint}));
       const result=await rpc('commit',{previewId:preview.previewId,requestId:preview.requestId});

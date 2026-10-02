@@ -58,6 +58,10 @@ assert.match(publishScript, /e:'evening'/);
 assert.match(publishScript, /addEventListener\('nikkei-file-metadata',syncMeta\)/);
 assert.match(publishScript, /const edition=activeEdition\(\)/);
 assert.match(publishScript, /buildMapRecordsFromCurrent\(date,edition\)/);
+assert.match(publishScript, /bridgeFrame\.hidden=true/);
+assert.doesNotMatch(publishScript, /popup=open/);
+assert.match(html, /manualState: state\.manual \? JSON\.parse\(JSON\.stringify\(state\.manual\)\) : null/);
+assert.match(html, /restoreSessionAfterPdfSelection\(state\.pendingRestoreSession\)/);
 
 assert.deepEqual(
   JSON.parse(JSON.stringify(context.pageRangesFrom(1, 19, 5))),
