@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 
-assert.match(html, /const APP_VERSION = 'v2026\.10\.02\.5'/);
+assert.match(html, /const APP_VERSION = 'v2026\.10\.02\.4'/);
 assert.match(html, /const APP_VERSION_NAME = '日経マップ直接反映版'/);
 assert.match(html, /id="appVersion"/);
 assert.match(html, /id="versionStatus">最新版を表示中/);
