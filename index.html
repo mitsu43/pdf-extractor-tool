@@ -1043,7 +1043,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.02.4';
+const APP_VERSION = 'v2026.10.02.3';
 const APP_VERSION_NAME = '日経マップ直接反映版';
 
 // =====================================================================
@@ -1259,7 +1259,6 @@ const state = {
   resume: null,       // { phase: 'extract'|'enrich', nextIndex: N } — when extraction failed midway
   stopRequested: false, // Stop button pressed
   currentBatchPages: null, // Current batch's page range {startPage, endPage} for split-PDF download
-  pendingRestoreSession: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -1311,8 +1310,6 @@ async function saveSession() {
       pdfPageCount: state.pdfPageCount || 0,
       preset: state.preset,
       schemaFields: state.schema?.fields || null,
-      resume: state.resume ? JSON.parse(JSON.stringify(state.resume)) : null,
-      manualState: state.manual ? JSON.parse(JSON.stringify(state.manual)) : null,
     };
     await new Promise((resolve, reject) => {
       const tx = db.transaction(DB_STORE, 'readwrite');
@@ -2230,10 +2227,6 @@ async function handleFile(file) {
   applyNikkeiFileMetadata(file.name);
   updateStartBtn();
   updateCostEstimate();
-  if (state.pendingRestoreSession) {
-    restoreSessionAfterPdfSelection(state.pendingRestoreSession);
-    return;
-  }
   if ($('runMode').value === 'manual' && state.preset === 'nikkei') {
     startManualWorkflow({ autoPrepare: true });
   }
@@ -3058,7 +3051,6 @@ function startManualWorkflow(opts = {}) {
   }
   state.manual = {
     parallel: true,
-    sourceName: state.pdfFile?.name || '',
     batchSize,
     maxPages,
     testOnly,
@@ -5269,16 +5261,27 @@ function showRestoreBanner(session) {
 
   $('restoreYes').addEventListener('click', () => {
     state.articles = session.articles || [];
-    state.resume = session.resume || null;
-    state.pendingRestoreSession = session;
+    if (session.pdfName) {
+      state.pdfFile = { name: session.pdfName };
+      state.pdfPageCount = session.pdfPageCount || 0;
+    }
+    if (session.manualPhase) {
+      state.manual = {
+        phase: session.manualPhase,
+        index: session.manualIndex || 0,
+        batchSize: session.manualBatchSize || 5,
+        enrich: true,
+        enrichBatchSize: 20,
+      };
+    }
     renderResults();
     $('resultsSection').classList.remove('hidden');
     $('resetBtn').classList.remove('hidden');
-    banner.querySelector('div').innerHTML = `<strong>${escapeHtml(session.pdfName || '前回のPDF')}を選択してください</strong><br><span style="font-size:11px;color:#6b6359;">選択後、完了済みバッチと未完了バッチを復元します。</span>`;
-    $('restoreYes').disabled = true;
-    log(`<strong>復元準備</strong>: ${state.articles.length}件を読み込みました。前回のPDFを選択してください`, 'bold');
-    fileInput.value = '';
-    fileInput.click();
+    banner.remove();
+    log(`<strong>セッション復元</strong>: ${state.articles.length}件のデータを復元しました`, 'bold');
+    if (!state.pdfDoc) {
+      log(`⚠ PDFファイル本体は再アップロードが必要です（続きの抽出には必要、エクスポートは可能）`, 'warn');
+    }
   });
 
   $('restoreNo').addEventListener('click', () => {
@@ -5288,78 +5291,7 @@ function showRestoreBanner(session) {
     }
   });
 }
-
-function restoreSessionAfterPdfSelection(session) {
-  const expectedName = String(session.pdfName || '');
-  if (expectedName && state.pdfFile?.name !== expectedName) {
-    $('restoreYes')?.removeAttribute('disabled');
-    alert(`前回のPDF「${expectedName}」を選択してください。\n選択されたファイル: ${state.pdfFile?.name || ''}`);
-    return;
-  }
-
-  state.articles = Array.isArray(session.articles) ? session.articles : [];
-  state.resume = session.resume || null;
-  if (Array.isArray(session.schemaFields) && state.schema) {
-    state.schema.fields = session.schemaFields.map(field => ({ ...field }));
-    renderSchemaTable();
-  }
-
-  const savedManual = session.manualState;
-  if (savedManual?.batches?.length) {
-    state.manual = JSON.parse(JSON.stringify(savedManual));
-    state.manual.sourceName = state.pdfFile.name;
-  } else if ($('runMode').value === 'manual') {
-    const batchSize = Math.min(5, parseInt(session.manualBatchSize, 10) || 5);
-    const ranges = pageRangesFrom(1, state.pdfPageCount, batchSize);
-    const batches = ranges.map((range, id) => {
-      const articles = state.articles.filter(article => {
-        const page = parseInt(article.page, 10);
-        return page >= range.startPage && page <= range.endPage;
-      });
-      return {
-        id,
-        ...range,
-        status: articles.length ? 'done' : 'pending',
-        articleCount: articles.length,
-        articles,
-        summary: articles.length ? `✓ ${articles.length}件 復元済み` : '',
-      };
-    });
-    state.manual = {
-      parallel: true,
-      sourceName: state.pdfFile.name,
-      batchSize,
-      maxPages: state.pdfPageCount,
-      testOnly: false,
-      batches,
-      prepared: true,
-      finalized: batches.every(batch => batch.status === 'done'),
-    };
-  }
-
-  state.pendingRestoreSession = null;
-  document.getElementById('restoreBanner')?.remove();
-  renderResults();
-  $('resultsSection').classList.remove('hidden');
-  $('resetBtn').classList.remove('hidden');
-  if (state.manual?.batches?.length) {
-    $('manualSection').classList.remove('hidden');
-    renderBatchGrid();
-    const done = state.manual.batches.filter(batch => batch.status === 'done').length;
-    $('manualStatus').textContent = `${done}/${state.manual.batches.length}バッチ復元済み`;
-    setStatus(done === state.manual.batches.length ? '復元完了' : '続きから再開可能');
-    log(`<strong>セッション復元完了</strong>: ${done}/${state.manual.batches.length}バッチ、${state.articles.length}件`, 'ok');
-  } else if (state.resume) {
-    $('resumeBtn').classList.remove('hidden');
-    setStatus('続きから再開可能');
-    log(`<strong>セッション復元完了</strong>: 「続きから再開」を押すと処理を再開します`, 'ok');
-  } else {
-    setStatus('復元完了');
-    log(`<strong>セッション復元完了</strong>: ${state.articles.length}件`, 'ok');
-  }
-  updateStartBtn();
-}
 </script>
-<script src="map-publish.js?v=20261002-4"></script>
+<script src="map-publish.js?v=20261002-3"></script>
 </body>
 </html>
