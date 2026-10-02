@@ -23,7 +23,7 @@
     <div class="map-update-log" id="publishStatus" role="status">抽出完了後、「更新内容を確認」を押してください。</div>`;
   const get=id=>document.getElementById(id);
   const say=text=>{get('publishStatus').textContent=text;};
-  let bridgeFrame=null, bridgeReady=null, preview=null, fingerprint='', busy=false;
+  let bridgeWindow=null, preview=null, fingerprint='', busy=false;
   const calls=new Map();
 
   function activeMeta(){
@@ -52,43 +52,33 @@
   addEventListener('message',event=>{
     if(event.origin!==MAP||event.data?.channel!==CHANNEL)return;
     const call=calls.get(event.data.id);if(!call)return;
-    calls.delete(event.data.id);clearTimeout(call.timer);
+    calls.delete(event.data.id);clearTimeout(call.timer);clearInterval(call.interval);
     if(event.data.error)call.reject(Object.assign(new Error(event.data.error),{status:event.data.status}));
     else call.resolve(event.data.result);
   });
 
   function rpc(action,body){return new Promise((resolve,reject)=>{
-    if(!bridgeFrame?.contentWindow)return reject(new Error('日経マップへ接続できません'));
+    if(!bridgeWindow||bridgeWindow.closed)return reject(new Error('接続用画面が閉じています'));
     const id=crypto.randomUUID();
-    const timer=setTimeout(()=>{calls.delete(id);reject(new Error('接続画面から応答がありません。接続状態を確認してください。'));},60000);
-    calls.set(id,{resolve,reject,timer});
-    bridgeFrame.contentWindow.postMessage({channel:CHANNEL,id,action,body},MAP);
+    const send=()=>{if(bridgeWindow&&!bridgeWindow.closed)bridgeWindow.postMessage({channel:CHANNEL,id,action,body},MAP);};
+    const interval=setInterval(send,500);
+    const timer=setTimeout(()=>{calls.delete(id);clearInterval(interval);reject(new Error('接続用画面から応答がありません。画面を閉じて、もう一度お試しください。'));},60000);
+    calls.set(id,{resolve,reject,timer,interval});
+    send();
   });}
 
   function connect(){
-    if(bridgeFrame?.contentWindow&&bridgeReady)return bridgeReady;
-    bridgeFrame=document.createElement('iframe');
-    bridgeFrame.src=`${MAP}/article-import.html?embed=1`;
-    bridgeFrame.title='日経マップ接続';
-    bridgeFrame.style.cssText='position:fixed;left:-10px;bottom:-10px;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
-    bridgeReady=new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>reject(new Error('日経マップへの接続がタイムアウトしました')),15000);
-      bridgeFrame.onload=()=>{clearTimeout(timer);resolve(true);};
-      bridgeFrame.onerror=()=>{clearTimeout(timer);reject(new Error('日経マップへ接続できません'));};
-    });
-    document.body.appendChild(bridgeFrame);
-    return bridgeReady;
+    if(!bridgeWindow||bridgeWindow.closed){
+      bridgeWindow=open(`${MAP}/article-import.html`,'nikkei-map-import','popup=yes,width=720,height=520');
+    }
+    if(!bridgeWindow)throw new Error('接続用画面を開けません。ポップアップを許可してください。');
+    bridgeWindow.focus();
+    return true;
   }
 
-  function hideBridgeSetup(){
-    if(!bridgeFrame)return;
-    bridgeFrame.style.cssText='position:fixed;left:-10px;bottom:-10px;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
-  }
-
-  function showBridgeSetup(){
-    if(!bridgeFrame)return;
-    bridgeFrame.style.cssText='display:block;width:100%;height:245px;border:1px solid #c8c1b4;margin-top:10px;background:#fff';
-    say('初回接続が必要です。下の「公開キー」を入力して接続後、もう一度「更新内容を確認」を押してください。');
+  function closeConnection(){
+    if(bridgeWindow&&!bridgeWindow.closed)bridgeWindow.close();
+    bridgeWindow=null;
   }
 
   function input(){
@@ -115,34 +105,40 @@
   get('publishPreview').onclick=async()=>{
     if(busy)return;
     syncMeta();
-    busy=true;get('publishCommit').disabled=true;say('更新内容を確認しています。');
+    busy=true;get('publishCommit').disabled=true;say('接続用の小画面で更新内容を確認しています。完了後は自動で閉じます。');
     try{
-      await connect();
+      connect();
       const payload=input();
       fingerprint=await digest(payload);
       await rpc('ping',{});
-      hideBridgeSetup();
       preview=await rpc('preview',{input:payload});
       sessionStorage.setItem(SESSION_KEY,JSON.stringify({preview,fingerprint}));
       say(`${preview.date} ${editionLabels[preview.edition]||preview.edition}: ${preview.incoming}件を反映します。既存${preview.existing}件、新規${preview.added}件、更新${preview.updated}件、除外${preview.removed}件。対象外${preview.preserved}件は保持します。`);
       get('publishCommit').disabled=false;
-    }catch(error){if(error.status===401)showBridgeSetup();else say(error.message);}finally{busy=false;}
+      closeConnection();
+    }catch(error){
+      if(error.status===401)say('初回接続が必要です。開いた小画面で公開キーを入力して「接続」を押し、その後もう一度「更新内容を確認」を押してください。');
+      else{say(error.message);closeConnection();}
+    }finally{busy=false;}
   };
 
   get('publishCommit').onclick=async()=>{
     if(busy||!preview)return;
     busy=true;get('publishCommit').disabled=true;
     try{
-      await connect();
+      connect();
+      await rpc('ping',{});
       if(!preview.sent&&await digest(input())!==fingerprint)throw Object.assign(new Error('確認後に内容が変わりました。更新内容を確認し直してください。'),{status:409});
       preview.sent=true;sessionStorage.setItem(SESSION_KEY,JSON.stringify({preview,fingerprint}));
       const result=await rpc('commit',{previewId:preview.previewId,requestId:preview.requestId});
       say(`本番反映済み: ${result.date} ${editionLabels[result.edition]||result.edition} ${result.incoming}件。更新前データも自動バックアップしました。`);
+      closeConnection();
       preview=null;sessionStorage.removeItem(SESSION_KEY);
     }catch(error){
-      say(error.message);
+      say(error.status===401?'接続用の小画面で公開キーを設定してください。':error.message);
       if(error.status===409){preview=null;sessionStorage.removeItem(SESSION_KEY);}
       else get('publishCommit').textContent='2. 同じ更新を再確認';
+      if(error.status!==401)closeConnection();
     }finally{busy=false;get('publishCommit').disabled=!preview;}
   };
 })();
