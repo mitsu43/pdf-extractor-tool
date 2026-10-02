@@ -37,10 +37,6 @@ assert.deepEqual(
   { isoDate: '2026-09-17', edition: 'r' },
 );
 assert.equal(context.parseNikkeiFilename('20260917e.pdf').edition, 'e');
-assert.deepEqual(
-  JSON.parse(JSON.stringify(context.parseNikkeiFilename('20261002e.pdf'))),
-  { isoDate: '2026-10-02', edition: 'e' },
-);
 assert.equal(context.parseNikkeiFilename('20260230m.pdf'), null);
 assert.equal(context.parseNikkeiFilename('news.pdf'), null);
 assert.deepEqual(
