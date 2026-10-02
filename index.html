@@ -1043,7 +1043,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.02.3';
+const APP_VERSION = 'v2026.10.02.2';
 const APP_VERSION_NAME = '日経マップ直接反映版';
 
 // =====================================================================
@@ -2292,14 +2292,12 @@ function parseNikkeiFilename(filename, today = new Date()) {
 function applyNikkeiFileMetadata(filename) {
   const meta = parseNikkeiFilename(filename);
   if (!meta) return false;
-  state.nikkeiMeta = meta;
   if ($('mapDateInput')) $('mapDateInput').value = meta.isoDate;
   if ($('mapEditionSelect')) $('mapEditionSelect').value = MAP_ED_FROM_CODE[meta.edition];
   if ($('batchSize')) {
     $('batchSize').value = '5';
     $('batchSize').max = '5';
   }
-  window.dispatchEvent(new CustomEvent('nikkei-file-metadata', { detail: meta }));
   return true;
 }
 
@@ -4930,8 +4928,7 @@ function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
   const analysis = mapAnalysisValues(a);
   const loc = parseMapLocation(a.map_json || a['地図の住所'] || a.location);
   const no = parseInt(a.no || a.No || idx + 1, 10) || idx + 1;
-  // The selected PDF filename is authoritative. Gemini may incorrectly return m for an evening edition.
-  const edition = defaultEdition;
+  const edition = MAP_ED_FROM_CODE[String(a.edition || '').toLowerCase()] || defaultEdition;
   const page = String(a.page || a['PDFページ'] || a.men || '').replace(/(\d+)\.0+/g, '$1');
   return {
     id: idBase + idx + 1,
@@ -5024,11 +5021,10 @@ function repairMapRecords(records, fallbackDate = '', fallbackEdition = 'morning
     .map((record, idx) => ({ ...record, id: idx + 1 }));
 }
 
-function buildMapRecordsFromCurrent(dateValue = '', editionValue = '') {
-  const fileMeta = parseNikkeiFilename(state.pdfFile?.name || '');
-  const dateKey = mapDateKey(dateValue || fileMeta?.isoDate || $('mapDateInput')?.value);
+function buildMapRecordsFromCurrent() {
+  const dateKey = mapDateKey($('mapDateInput')?.value);
   if (!dateKey) throw new Error('日付を指定してください');
-  const defaultEdition = editionValue || MAP_ED_FROM_CODE[fileMeta?.edition] || $('mapEditionSelect')?.value || 'morning';
+  const defaultEdition = $('mapEditionSelect')?.value || 'morning';
   const baseId = mapArticles.length > 0 ? Math.max(...mapArticles.map(a => parseInt(a.id, 10) || 0)) : 0;
   return repairMapRecords(state.articles.map((a, idx) => articleToMapRecord(a, idx, dateKey, defaultEdition, baseId)), dateKey, defaultEdition);
 }
@@ -5292,6 +5288,6 @@ function showRestoreBanner(session) {
   });
 }
 </script>
-<script src="map-publish.js?v=20261002-3"></script>
+<script src="map-publish.js?v=20261002-2"></script>
 </body>
 </html>

@@ -50,14 +50,6 @@ assert.deepEqual(
 assert.equal(context.parseNikkeiFilename('朝刊.pdf', new Date(2026, 9, 2)).edition, 'm');
 assert.equal(context.parseNikkeiFilename('地方版.pdf', new Date(2026, 9, 2)).edition, 'r');
 assert.equal(context.parseNikkeiFilename('p.pdf', new Date(2026, 9, 2)).edition, 'p');
-assert.match(html, /const edition = defaultEdition;/);
-assert.match(html, /dateValue \|\| fileMeta\?\.isoDate \|\| \$\('mapDateInput'\)\?\.value/);
-assert.match(html, /editionValue \|\| MAP_ED_FROM_CODE\[fileMeta\?\.edition\] \|\| \$\('mapEditionSelect'\)\?\.value \|\| 'morning'/);
-const publishScript = fs.readFileSync(new URL('./map-publish.js', import.meta.url), 'utf8');
-assert.match(publishScript, /e:'evening'/);
-assert.match(publishScript, /addEventListener\('nikkei-file-metadata',syncMeta\)/);
-assert.match(publishScript, /const edition=activeEdition\(\)/);
-assert.match(publishScript, /buildMapRecordsFromCurrent\(date,edition\)/);
 
 assert.deepEqual(
   JSON.parse(JSON.stringify(context.pageRangesFrom(1, 19, 5))),
