@@ -68,9 +68,9 @@
   function connect(){
     if(bridgeFrame?.contentWindow&&bridgeReady)return bridgeReady;
     bridgeFrame=document.createElement('iframe');
-    bridgeFrame.src=`${MAP}/article-import.html`;
+    bridgeFrame.src=`${MAP}/article-import.html?embed=1`;
     bridgeFrame.title='日経マップ接続';
-    bridgeFrame.hidden=true;
+    bridgeFrame.style.cssText='position:fixed;left:-10px;bottom:-10px;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
     bridgeReady=new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>reject(new Error('日経マップへの接続がタイムアウトしました')),15000);
       bridgeFrame.onload=()=>{clearTimeout(timer);resolve(true);};
@@ -78,6 +78,17 @@
     });
     document.body.appendChild(bridgeFrame);
     return bridgeReady;
+  }
+
+  function hideBridgeSetup(){
+    if(!bridgeFrame)return;
+    bridgeFrame.style.cssText='position:fixed;left:-10px;bottom:-10px;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+  }
+
+  function showBridgeSetup(){
+    if(!bridgeFrame)return;
+    bridgeFrame.style.cssText='display:block;width:100%;height:245px;border:1px solid #c8c1b4;margin-top:10px;background:#fff';
+    say('初回接続が必要です。下の「公開キー」を入力して接続後、もう一度「更新内容を確認」を押してください。');
   }
 
   function input(){
@@ -110,11 +121,12 @@
       const payload=input();
       fingerprint=await digest(payload);
       await rpc('ping',{});
+      hideBridgeSetup();
       preview=await rpc('preview',{input:payload});
       sessionStorage.setItem(SESSION_KEY,JSON.stringify({preview,fingerprint}));
       say(`${preview.date} ${editionLabels[preview.edition]||preview.edition}: ${preview.incoming}件を反映します。既存${preview.existing}件、新規${preview.added}件、更新${preview.updated}件、除外${preview.removed}件。対象外${preview.preserved}件は保持します。`);
       get('publishCommit').disabled=false;
-    }catch(error){say(error.message);}finally{busy=false;}
+    }catch(error){if(error.status===401)showBridgeSetup();else say(error.message);}finally{busy=false;}
   };
 
   get('publishCommit').onclick=async()=>{
