@@ -26,13 +26,23 @@
   let popup=null, preview=null, fingerprint='', busy=false;
   const calls=new Map();
 
+  function activeMeta(){
+    return typeof parseNikkeiFilename==='function' ? parseNikkeiFilename(state.pdfFile?.name||'') : null;
+  }
+
+  function activeEdition(){
+    const code=activeMeta()?.edition;
+    return ({m:'morning',e:'evening',r:'regional',p:'plusone'})[code]||document.getElementById('mapEditionSelect')?.value||'morning';
+  }
+
   function syncMeta(){
-    get('publishDate').value=document.getElementById('mapDateInput')?.value||new Date().toISOString().slice(0,10);
-    const edition=document.getElementById('mapEditionSelect')?.value||'morning';
+    get('publishDate').value=activeMeta()?.isoDate||document.getElementById('mapDateInput')?.value||new Date().toISOString().slice(0,10);
+    const edition=activeEdition();
     get('publishEdition').textContent=editionLabels[edition]||edition;
     get('publishCount').textContent=`${state.articles.length}件`;
   }
   syncMeta();
+  addEventListener('nikkei-file-metadata',syncMeta);
 
   try{
     const saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
@@ -69,10 +79,10 @@
     const validation=runValidation();
     if(!validation.allOk)throw new Error('品質検査に未合格の項目があります');
     const date=get('publishDate').value;
-    const edition=document.getElementById('mapEditionSelect')?.value||'morning';
+    const edition=activeEdition();
     const sourceDate=document.getElementById('mapDateInput');
     if(sourceDate)sourceDate.value=date;
-    const records=buildMapRecordsFromCurrent().map(record=>({...record,date:mapDateKey(date),edition}));
+    const records=buildMapRecordsFromCurrent(date,edition).map(record=>({...record,date:mapDateKey(date),edition}));
     return {date,edition,mode:'replace',complete:true,reviewed:true,expectedCount:records.length,records};
   }
 
