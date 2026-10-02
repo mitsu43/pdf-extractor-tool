@@ -550,17 +550,8 @@ table.results tr:hover td { background: #fdfaf1; }
 .result-article-actions .detail-toggle { margin-top: 0; }
 .article-illustration-btn { min-height: 34px; padding: 6px 10px; }
 .illustration-help { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); color: var(--gray); font-size: 11px; line-height: 1.7; }
-.page-illustration-panel { padding: 14px 20px; background: var(--paper-2); border-bottom: 1px solid var(--line); }
-.page-illustration-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-.page-illustration-head strong { font-family: 'Noto Sans JP', sans-serif; font-size: 13px; }
-.page-illustration-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 3px; }
-.page-illustration-card { flex: 0 0 min(300px, 82vw); background: white; padding: 10px 12px; border: 1px solid var(--line-soft); }
-.page-illustration-card-title { font: 700 12px 'Noto Sans JP', sans-serif; margin-bottom: 4px; }
-.page-illustration-card-note { color: var(--gray); font: 11px/1.5 'Noto Sans JP', sans-serif; margin-bottom: 8px; }
-.page-illustration-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.page-illustration-ready { color: var(--ok); font-weight: 700; }
 @media (pointer: coarse) {
-  .article-illustration-btn, .page-illustration-actions .btn { min-height: 44px; }
+  .article-illustration-btn { min-height: 44px; }
 }
 
 .map-update-panel { background: white; border: 1px solid var(--line); padding: 18px 20px; margin-top: 16px; font-family: 'Noto Sans JP', sans-serif; }
@@ -651,7 +642,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>実行モード</label>
       <select id="runMode">
-        <option value="manual" selected>Gemini手動相談（API課金なし）</option>
+        <option value="manual" selected>Gemini手動連携（APIキー不要・推奨）</option>
         <option value="api">Gemini API自動</option>
       </select>
       <span class="desc">手動相談は、このツールで指示文を作り、Geminiブラウザに貼ってJSONを戻します。</span>
@@ -664,9 +655,9 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>モデル</label>
       <select id="model">
-        <option value="gemini-2.5-pro">gemini-2.5-pro (高精度 / 無料枠 100回/日)</option>
+        <option value="gemini-2.5-pro" selected>gemini-2.5-pro (高精度 / 無料枠 100回/日)</option>
         <option value="gemini-2.5-flash">gemini-2.5-flash (中精度 / 無料枠 250回/日)</option>
-        <option value="gemini-2.5-flash-lite" selected>gemini-2.5-flash-lite (推奨・最安 / 無料枠 1000回/日)</option>
+        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (最安 / 無料枠 1000回/日)</option>
       </select>
       <span class="desc">コスト試算と実行で使用。</span>
     </div>
@@ -770,8 +761,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
   <div class="form-grid three">
     <div class="field">
       <label>分割バッチサイズ (ページ)</label>
-      <input type="number" id="batchSize" value="5" min="2" max="30">
-      <span class="desc"><strong>2以上推奨</strong>。濃い内容(法律書等)は5前後、新聞は10以上が目安。切れたら自動で半分に分割します。</span>
+      <input type="number" id="batchSize" value="5" min="2" max="5">
+      <span class="desc"><strong>新聞は最大5ページに固定</strong>。出力が切れた場合は自動でさらに分割します。</span>
     </div>
     <div class="field">
       <label>呼出間隔（秒）</label>
@@ -790,12 +781,16 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
       <span><strong>無料枠セーフモード</strong>（モデル別RPMに合わせて自動で呼出間隔を調整）</span>
     </label>
     <label class="checkbox">
-      <input type="checkbox" id="strictMode">
-      <span>厳格モード（検証警告をログに表示）</span>
+      <input type="checkbox" id="strictMode" checked>
+      <span>厳格モード（不備のあるバッチを自動再試行）</span>
     </label>
     <label class="checkbox" id="enrichLabel">
       <input type="checkbox" id="enrichFM" checked>
       <span id="enrichLabelText">深掘り分析を実施（プリセットが定義されている場合）</span>
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="autoFinalize" checked>
+      <span><strong>自動運転</strong>（重複排除・検査合格後に本番用JSONを自動保存）</span>
     </label>
   </div>
 
@@ -867,13 +862,15 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
       <!-- Bulk preparation section -->
       <div id="bulkPrepRow" style="background: rgba(184, 36, 42, 0.06); border: 1px solid #b8242a; border-left-width: 5px; padding: 14px 16px; margin-bottom: 16px;">
         <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 700; color: #14110d; margin-bottom: 6px;">
-          📦 まずは「全バッチを一括準備」をタップ
+          📦 PDF分割とGemini入力をまとめて準備
         </div>
         <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: #6b6359; line-height: 1.7; margin-bottom: 10px;" id="bulkPrepDesc">
-          バッチ数分の分割PDFと指示文を一気に用意します。準備後、各バッチをGeminiの別タブで並行処理し、戻ってきたJSONを各欄に貼ると自動取込されます。
+          「分割PDF一括」で全PDFを保存できます。Chrome拡張機能を入れると、バッチ数分のGeminiタブを開き、各タブへ対応する指示文を自動入力します。
         </div>
         <div class="action-row" style="justify-content:flex-start; gap: 8px; flex-wrap: wrap; margin: 0;">
           <button class="btn btn-primary btn-sm" id="bulkPrepBtn">📦 全バッチを一括準備</button>
+          <button class="btn btn-secondary btn-sm" id="downloadAllBatchPdfsBtn" disabled>📎 分割PDF一括</button>
+          <button class="btn btn-secondary btn-sm" id="extensionGeminiBtn" disabled>🧩 Geminiへ自動入力</button>
           <button class="btn btn-secondary btn-sm" id="openAllGeminiTabsBtn" disabled>🚀 Geminiタブ一括</button>
           <button class="btn btn-secondary btn-sm" id="copyAllBatchPromptsBtn" disabled>📋 全指示文コピー</button>
         </div>
@@ -974,14 +971,6 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <button class="btn btn-secondary btn-sm" id="exportMapJson">Map data.json</button>
       </div>
     </div>
-    <div class="page-illustration-panel" id="pageIllustrationPanel">
-      <div class="page-illustration-head">
-        <div><strong>面単位の解説イラスト</strong><span class="results-count" id="pageIllustrationCount">0面</span></div>
-        <button class="btn btn-secondary btn-sm" id="exportPageIllustrationPack" disabled>マップ登録用画像パック保存</button>
-      </div>
-      <div class="page-illustration-list" id="pageIllustrationList"></div>
-      <div class="illustration-help">各面の「Geminiで生成」で指示文をコピーし、生成画像を端末へ保存後、「画像を選択」で登録してください。最後に画像パックを保存し、記事マップの「面サマリ」から読み込みます。</div>
-    </div>
     <div class="results-body">
       <table class="results" id="resultsTable">
         <thead id="resultsHead"></thead>
@@ -1054,8 +1043,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.09.09.4';
-const APP_VERSION_NAME = '高校生にもわかる解説イラスト版';
+const APP_VERSION = 'v2026.09.30.2';
+const APP_VERSION_NAME = '解説文章改善版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -1074,19 +1063,42 @@ const MODEL_LABELS = {
 };
 
 const HIGH_SCHOOL_EXPLANATION_RULE = [
-  '【高校生向けニュース解説ルール】',
-  'この抽出結果は、高校生が新聞記事を理解するために使います。',
-  '内容・詳細、思惑と狙い/本音、理解すべき内容、記者が伝えたいことなどの解説系フィールドは、専門家向けではなく高校生にも意味が分かる文章で書いてください。',
-  '各解説系フィールドの冒頭は、必ず「一言でいうと、〇〇。」で始めてください。',
-  '難しい政治・経済・金融・国際情勢の専門用語は、その場で短く意味を補足してください。',
-  '「何が起きたか」「なぜ起きたか」「誰に影響するか」「生活・会社・お金・国際関係にどう関係するか」が分かるように説明してください。',
-  '子ども向けにしすぎず、高校生向けのニュース解説として、やさしい日本語で書いてください。'
+  "【ニュース解説の文章ルール】",
+  "予備知識のない読者にも伝わる、簡潔で自然な日本語で書く。説明の深さを落としたり、子どもに語りかける口調にしたりしない。",
+  "主語と述語、原因と結果、比較の対象を明確にする。専門用語は理解に必要なものだけ文中で短く補足する。",
+  "決まり文句で書き始めない。短文や体言止めを並べず、前の文を受けて次の文が展開する段落にする。",
+  "抽象的な重要性を繰り返さず、その記事に固有の事実を使って、何がどう変わり、誰にどのような影響が及ぶのかを説明する。"
 ].join('\n');
 
 function ensureHighSchoolExplanationRule(rules) {
   const base = String(rules || '').trim();
   if (base.includes('【高校生向けニュース解説ルール】') || base.includes('高校生が新聞記事を理解')) return base;
   return `${base}${base ? '\n' : ''}${HIGH_SCHOOL_EXPLANATION_RULE}`;
+}
+
+const NEWS_CHANGE_RULE = [
+  "【解説の編集方針】",
+  "分析の焦点と文体について古い保存済み指示と矛盾する場合はこのルールを優先する。冒頭の定型句や高校生向けの語り口を求める旧指示は適用しない。",
+  "変化の方向や先行きを、背景と因果関係の説明に自然に織り込む。本文中に分析項目名や【記事の見通し】【AIの推測】【注目点】などのラベルを出力しない。「世の中の変化は」「今後の展開予想は」と宣言する書き方もしない。",
+  "content_detailは出来事の核心を、主体・行動・重要な数字と背景を結び付けて伝える。原文の事実を優先し、推測を混ぜない。",
+  "change_directionは要約の言い換えにせず、従来との違いと、それを生む制度・需要・技術・競争条件などを記事の根拠に沿って説明する。記事にない因果関係や社会全体への一般化を付け足さない。",
+  "future_outlookはその動きが続く条件や制約、それによって影響を受ける主体の選択肢を掘り下げる。記事の予測には「会社は〜を見込む」など発言主体を添える。推論には「〜が続けば」「〜につながる可能性がある」と根拠と条件を文中に含め、確定事実と区別する。",
+  "見通しが原文にない場合、記載なしという定型の断り書きで埋めない。推論の根拠も乏しければ、判断を左右する未確定の条件を具体的に述べる。それも読み取れなければ短くとどめ、予測を作らない。",
+  "三つの欄で同じ説明や結論を繰り返さない。「重要である」「今後の動向が注目される」「私たちの生活に影響する」だけで締めず、何が判断の分かれ目なのかを具体的にする。すべての記事を同じ文型に押し込めない。",
+  "文化・コラム・スポーツ・訃報には、その作品・議論・功績に固有の意味を扱い、無理に経済効果や将来予測へ結び付けない。",
+  "将来の確率・時期・業績数値、原文にない事情・動機・因果関係を創作しない。文章の巧さより内容の正確さを優先する。"
+].join('\n');
+
+function newsChangeRule(fields) {
+  return (fields || []).some(f => f.key === 'change_direction' || f.key === 'future_outlook') ? NEWS_CHANGE_RULE : '';
+}
+function mapAnalysisValues(record) {
+  const change = String(record.change_direction || record['世の中の変化と方向性'] || '').trim();
+  const outlook = String(record.future_outlook || record['今後の展開予想'] || '').trim();
+  if(change && outlook) return { understanding: change, intent: outlook, analysis_mode: 'change-outlook-v1' };
+  return { understanding: String(record['理解'] || record.key_insights || record['理解すべき内容'] || ''),
+    intent: String(record['思惑'] || record.intent_motive || record['思惑と狙い/本音'] || ''),
+    ...(record.analysis_mode === 'change-outlook-v1' ? {analysis_mode:record.analysis_mode} : {}) };
 }
 
 // Token assumptions per PDF page rendered at the tool's resolution (~1800px wide)
@@ -1104,8 +1116,8 @@ const ITEMS_PER_PAGE_DEFAULT = 4;     // Rough density assumption
 const PRESETS = {
   nikkei: {
     id: 'nikkei',
-    name: '日経新聞（標準）',
-    description: '日経新聞から記事を抽出。A〜E列の基本情報 + F〜N列の深掘り分析・クイズ・地図JSON・版種・記事位置。全14列。',
+    name: '日経新聞（社会の変化・展開予想）',
+    description: '日経新聞から記事を抽出。A〜E列の基本情報 + 記事の要点・社会の変化・展開予想・クイズ・地図JSON・版種・記事位置。全14列。',
     itemsPerPage: 5,
     role: `あなたは日本経済新聞の読者層にふさわしい、知的で洞察に満ちた表現を用いる、国際情勢と金融市場に精通したシニアエコノミストです。
 単なる事実の羅列ではなく、経済のダイナミズムを感じさせる専門的な分析を行います。`,
@@ -1132,9 +1144,9 @@ const PRESETS = {
       { key: 'headline', label: '見出し',      type: 'string',  required: true, desc: '【E列】記事のメインタイトル（副題があれば「主見出し　副見出し」のように併記）' },
     ],
     enrichFields: [
-      { key: 'content_detail', label: '記事内容要約',    type: 'string', long: true,  desc: '【F列】120〜160字程度。必ず冒頭を「一言でいうと、〇〇。」で始める。背景・具体的な数値・今後の見通しを、高校生にも分かるやさしい日本語で2〜3文に収める' },
-      { key: 'intent_motive',  label: '思惑と狙い/本音', type: 'string', long: true, desc: '【G列】60〜100字程度。必ず冒頭を「一言でいうと、〇〇。」で始める。関係者の思惑・狙い・本音を高校生にも分かる言葉で1〜2文にする' },
-      { key: 'key_insights',   label: '記者が伝えたいこと',type: 'string', long: true,  desc: '【H列】60〜100字程度。必ず冒頭を「一言でいうと、〇〇。」で始める。読者が理解すべき意味・影響を高校生にも分かる言葉で1〜2文にする' },
+      { key: 'content_detail', label: '記事の要点', type: 'string', long: true, desc: '【F列】120〜200字を目安に、出来事の核心と背景を自然な2〜3文で伝える。原文の事実に基づき、推測や定型の前置きを入れない' },
+      { key: 'change_direction', label: '世の中の変化と方向性', type: 'string', long: true, desc: '【G列】120〜220字を目安に、従来との違い、その要因と具体的な影響を一続きの文章で掘り下げる。F列の繰り返しや分析項目名の前置きは不要。根拠のない一般化をしない' },
+      { key: 'future_outlook', label: '今後の展開予想', type: 'string', long: true, desc: '【H列】120〜220字を目安に、先行きを左右する条件と制約を自然な文章に織り込む。記事の予測は発言主体、推論は根拠と条件を文中で示す。ラベルや決まり文句は不要。根拠が薄ければ短くし、予測を創作しない' },
       { key: 'quiz_q',         label: 'クイズ（問）',  type: 'string', long: false, desc: '【I列】記事の重要ポイントから理解度を測る問い' },
       { key: 'quiz_a',         label: 'クイズ（解）',  type: 'string', long: false, desc: '【J列】クイズの正解' },
       { key: 'keyword',        label: 'キーワード解説',type: 'string', long: false, desc: '【K列】正解や記事内容に関連する専門用語を1つ選び解説' },
@@ -2184,6 +2196,11 @@ async function handleFile(file) {
     alert('PDFファイルを選択してください');
     return;
   }
+  const nikkeiLike = /^\d{8}[merp]\.pdf$/i.test(file.name);
+  if (state.preset === 'nikkei' && !nikkeiLike) {
+    alert('日経新聞PDFのファイル名は、日本時間の日付8桁 + 版種で指定してください。\n例: 20260917m.pdf / 20260917e.pdf / 20260917r.pdf');
+    return;
+  }
   // Warn for very large PDFs (>30MB) — iPad Safari may struggle
   if (file.size > 30 * 1024 * 1024) {
     const sizeMB = (file.size / 1024 / 1024).toFixed(1);
@@ -2207,8 +2224,12 @@ async function handleFile(file) {
     return;
   }
   renderPdfInfo();
+  applyNikkeiFileMetadata(file.name);
   updateStartBtn();
   updateCostEstimate();
+  if ($('runMode').value === 'manual' && state.preset === 'nikkei') {
+    startManualWorkflow({ autoPrepare: true });
+  }
 }
 
 function renderPdfInfo() {
@@ -2237,6 +2258,29 @@ function detectEdition(filename) {
   return '?';
 }
 
+function parseNikkeiFilename(filename) {
+  const match = String(filename || '').match(/^(\d{4})(\d{2})(\d{2})([merp])\.pdf$/i);
+  if (!match) return null;
+  const [, year, month, day, edition] = match;
+  const isoDate = `${year}-${month}-${day}`;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== Number(year)
+      || date.getUTCMonth() + 1 !== Number(month) || date.getUTCDate() !== Number(day)) return null;
+  return { isoDate, edition: edition.toLowerCase() };
+}
+
+function applyNikkeiFileMetadata(filename) {
+  const meta = parseNikkeiFilename(filename);
+  if (!meta) return false;
+  if ($('mapDateInput')) $('mapDateInput').value = meta.isoDate;
+  if ($('mapEditionSelect')) $('mapEditionSelect').value = MAP_ED_FROM_CODE[meta.edition];
+  if ($('batchSize')) {
+    $('batchSize').value = '5';
+    $('batchSize').max = '5';
+  }
+  return true;
+}
+
 // =====================================================================
 // Inputs / Start button
 // =====================================================================
@@ -2252,6 +2296,13 @@ function updateStartBtn() {
   $('testRunBtn').disabled = !ok || state.running;
 }
 $('runMode').addEventListener('change', updateStartBtn);
+$('batchSize').addEventListener('change', () => {
+  if (state.preset === 'nikkei' && Number($('batchSize').value) > 5) {
+    $('batchSize').value = '5';
+    log('新聞PDFは安全のため5ページ単位に自動修正しました', 'info');
+  }
+  updateCostEstimate();
+});
 $('resetBtn').addEventListener('click', () => {
   if (confirm('現在の作業データを破棄してリセットしますか？\n保存された前回データも消去されます。')) {
     clearSession().finally(() => location.reload());
@@ -2752,6 +2803,7 @@ ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 
 【抽出ルール】
 ${rules}
+${newsChangeRule(state.schema.fields)}
 
 【禁止事項（再掲・厳守）】
 - 「[cite: 24, 63]」「[cite_start]」「[24, 63]」のような引用タグは絶対に出力しないこと
@@ -2787,9 +2839,10 @@ ${editionCode}
 ${buildSchemaDescription(state.schema.enrichFields)}
 
 【トーン＆マナー】
-専門的で読者層に適した知的な表現。ただし読み上げ時間を抑えるため、記事内容要約は120〜160字、思惑と狙い/本音と記者が伝えたいことは各60〜100字を厳守すること。
+専門的で読者層に適した知的な表現。ただし読み上げ時間を抑えるため、各項目の長さはスキーマの指示に従うこと。
 
 ${HIGH_SCHOOL_EXPLANATION_RULE}
+${newsChangeRule(state.schema.enrichFields)}
 
 ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 - 地図・住所・場所フィールドは原則として必ず記入してください。空文字は最終手段。
@@ -2911,7 +2964,8 @@ ${enrichNote}
 ${buildSchemaDescription(allFields)}
 
 【抽出ルール】
-${rules}${locationGuide}${articleBoxesGuide}
+${rules}
+${newsChangeRule(allFields)}${locationGuide}${articleBoxesGuide}
 
 【出力例（1件分の例）】
 ${example}
@@ -2940,7 +2994,8 @@ ${JSON.stringify(payload.articles, null, 2)}
 【生成項目】
 ${buildSchemaDescription(state.schema.enrichFields)}
 
-${HIGH_SCHOOL_EXPLANATION_RULE}${locationGuide}${articleBoxesGuide}
+${HIGH_SCHOOL_EXPLANATION_RULE}
+${newsChangeRule(state.schema.enrichFields)}${locationGuide}${articleBoxesGuide}
 
 注意:
 - 入力データの no を必ず保持
@@ -2951,11 +3006,13 @@ ${HIGH_SCHOOL_EXPLANATION_RULE}${locationGuide}${articleBoxesGuide}
 
 function startManualWorkflow(opts = {}) {
   const testOnly = !!opts.testOnly;
+  const autoPrepare = opts.autoPrepare !== false;
   ensureDefaultEnrichSetting();
   state.running = true;
   state.articles = [];
 
-  const batchSize = testOnly ? 1 : (parseInt($('batchSize').value) || 5);
+  const requestedBatchSize = parseInt($('batchSize').value) || 5;
+  const batchSize = testOnly ? 1 : Math.min(5, requestedBatchSize);
   const maxPages = testOnly ? 1 : state.pdfPageCount;
   // Build batch definitions
   const batches = [];
@@ -2976,7 +3033,8 @@ function startManualWorkflow(opts = {}) {
     maxPages,
     testOnly,
     batches,
-    prepared: false,
+    prepared: autoPrepare,
+    finalized: false,
   };
 
   logEl.innerHTML = '';
@@ -2990,9 +3048,10 @@ function startManualWorkflow(opts = {}) {
   } else {
     log(`<strong>並列手動相談モード開始</strong> · ${state.pdfFile.name} · ${state.pdfPageCount}ページ · ${batches.length}バッチ`, 'bold');
   }
-  // Render batch grid in initial pending state, but bulk-prep is needed to populate prompts/PDFs
+  // Prompts and split-PDF download actions are ready immediately after upload.
   renderBatchGrid();
-  $('manualStatus').textContent = `${batches.length}バッチ準備待ち`;
+  $('manualStatus').textContent = autoPrepare ? `${batches.length}バッチ準備完了` : `${batches.length}バッチ準備待ち`;
+  if (autoPrepare) log(`📦 全 ${batches.length} バッチを5ページ以下で自動準備しました`, 'ok');
 }
 
 // Render all batch tiles (called whenever state changes)
@@ -3008,6 +3067,8 @@ function renderBatchGrid() {
   $('bulkPrepBtn').disabled = false;
   const openAllGeminiTabsBtn = $('openAllGeminiTabsBtn');
   const copyAllBatchPromptsBtn = $('copyAllBatchPromptsBtn');
+  const downloadAllBatchPdfsBtn = $('downloadAllBatchPdfsBtn');
+  const extensionGeminiBtn = $('extensionGeminiBtn');
   if (openAllGeminiTabsBtn) {
     openAllGeminiTabsBtn.textContent = prepared ? '🚀 Geminiタブ一括' : '🚀 準備してGemini一括';
     openAllGeminiTabsBtn.disabled = false;
@@ -3015,6 +3076,8 @@ function renderBatchGrid() {
   if (copyAllBatchPromptsBtn) {
     copyAllBatchPromptsBtn.disabled = !prepared;
   }
+  if (downloadAllBatchPdfsBtn) downloadAllBatchPdfsBtn.disabled = !prepared;
+  if (extensionGeminiBtn) extensionGeminiBtn.disabled = !prepared;
 
   // Build tiles HTML
   grid.innerHTML = m.batches.map(b => {
@@ -3083,7 +3146,7 @@ function updateOverallStatus() {
   const done = m.batches.filter(b => b.status === 'done').length;
   const err = m.batches.filter(b => b.status === 'error').length;
   const total = m.batches.length;
-  let status = `${done}/${total} 完了`;
+  let status = done === total ? `全${total}バッチ完了・自動検査中` : `${done}/${total} 完了`;
   if (err > 0) status += ` (${err}件エラー)`;
   $('manualStatus').textContent = status;
 }
@@ -3100,6 +3163,8 @@ function debounce(fn, ms) {
 // "Bulk prepare" — initialize prompts for all batches (PDFs are generated on-demand per batch)
 $('openAllGeminiTabsBtn')?.addEventListener('click', openAllGeminiTabs);
 $('copyAllBatchPromptsBtn')?.addEventListener('click', copyAllBatchPrompts);
+$('downloadAllBatchPdfsBtn')?.addEventListener('click', downloadAllBatchPdfs);
+$('extensionGeminiBtn')?.addEventListener('click', openGeminiTabsWithExtension);
 
 $('bulkPrepBtn').addEventListener('click', async () => {
   const m = state.manual;
@@ -3217,6 +3282,53 @@ async function openAllGeminiTabs() {
   }
 }
 
+function openGeminiTabsWithExtension() {
+  const m = state.manual;
+  if (!ensureManualPrepared() || !m?.batches?.length) return;
+  const requestId = `gemini-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const batches = m.batches.map(batch => ({
+    id: batch.id,
+    label: `バッチ${batch.id + 1} P${batch.startPage}-${batch.endPage}`,
+    prompt: buildBatchPrompt(batch.id),
+  }));
+  let acknowledged = false;
+  const onMessage = event => {
+    if (event.source !== window || event.data?.source !== 'pdf-extractor-extension' || event.data?.requestId !== requestId) return;
+    acknowledged = true;
+    window.removeEventListener('message', onMessage);
+    log(`🧩 Gemini ${event.data.opened || batches.length}タブへ指示文を割り当てました`, 'ok');
+  };
+  window.addEventListener('message', onMessage);
+  window.postMessage({ source: 'pdf-extractor-tool', type: 'OPEN_GEMINI_BATCHES', requestId, batches }, '*');
+  setTimeout(() => {
+    window.removeEventListener('message', onMessage);
+    if (!acknowledged) alert('Chrome拡張機能が見つかりません。配布ZIP内の chrome-extension フォルダをChromeへ読み込んでください。');
+  }, 1800);
+}
+
+async function downloadAllBatchPdfs() {
+  const m = state.manual;
+  if (!ensureManualPrepared() || !m?.batches?.length) return;
+  const btn = $('downloadAllBatchPdfsBtn');
+  btn.disabled = true;
+  const original = btn.textContent;
+  let completed = 0;
+  try {
+    for (const batch of m.batches) {
+      btn.textContent = `PDF作成 ${completed + 1}/${m.batches.length}`;
+      await downloadBatchPdf(batch.id);
+      completed += 1;
+      await new Promise(resolve => setTimeout(resolve, 350));
+    }
+    log(`📎 分割PDF ${completed}ファイルを一括ダウンロードしました`, 'ok');
+  } catch (err) {
+    log(`分割PDF一括ダウンロード中断: ${err.message}`, 'err');
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+
 async function downloadBatchPdf(batchId) {
   const m = state.manual;
   const b = m?.batches[batchId];
@@ -3279,12 +3391,15 @@ function importBatchJson(batchId, text) {
     const trimmed = String(text).trim().replace(/```\s*$/i, '').trim();
     const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}'));
 
-    // Validate page numbers fall within this batch's range
-    let outOfRange = 0;
-    arr.forEach(a => {
-      const p = parseInt(a.page);
-      if (!isNaN(p) && (p < b.startPage || p > b.endPage)) outOfRange++;
-    });
+    const fieldsToValidate = state.schema.fields.concat(
+      $('enrichFM')?.checked ? (state.schema.enrichFields || []).map(field => ({ ...field, required: true })) : []
+    );
+    const provisionalStartNo = (batchId * m.batchSize * 5) + 1;
+    const issues = validateBatch(arr, provisionalStartNo, b.startPage, b.endPage, { fieldsToValidate });
+    if (issues.length > 0) {
+      const preview = issues.slice(0, 5).join(' / ');
+      throw new Error(`必須項目の不足: ${preview}${issues.length > 5 ? ` ほか${issues.length - 5}件` : ''}`);
+    }
 
     // Store articles attached to this batch
     b.articles = arr;
@@ -3292,13 +3407,14 @@ function importBatchJson(batchId, text) {
     b.status = wasTruncated ? 'error' : 'done';
     b.summary = wasTruncated
       ? `⚠ 途中で切断: ${arr.length}件を救出 (バッチ未完了)`
-      : `✓ ${arr.length}件取り込み${outOfRange > 0 ? ` (⚠ ${outOfRange}件のpageが範囲外)` : ''}`;
+      : `✓ ${arr.length}件取り込み・厳格検査合格`;
     log(`✓ バッチ${batchId+1} (P${b.startPage}〜P${b.endPage}): ${b.articleCount}件取り込み${wasTruncated ? ' (切断)' : ''}`, wasTruncated ? 'warn' : 'ok');
 
     // Merge all completed batches into state.articles
     mergeBatchArticles();
     renderBatchGrid();  // Re-render to update colors/icons
     saveSession();
+    if (!wasTruncated) completeManualWorkflowIfReady();
   } catch (err) {
     b.articles = null;
     b.articleCount = 0;
@@ -3339,13 +3455,45 @@ function mergeBatchArticles() {
   });
   // Sort: by batch id (which equals page order), then by within-batch order
   all.sort((a, b) => (a._batch - b._batch) || (a._order - b._order));
-  // Renumber no field sequentially
-  all.forEach((a, i) => {
-    if ('no' in a || hasNoField()) a.no = i + 1;
-    delete a._batch;
-    delete a._order;
+  const normalized = all.map(a => {
+    const article = { ...a };
+    delete article._batch;
+    delete article._order;
+    return article;
   });
-  state.articles = all;
+  state.articles = dedupeAndRenumberArticles(normalized);
+}
+
+async function completeManualWorkflowIfReady() {
+  const m = state.manual;
+  if (!m || m.finalized || !m.batches.length || !m.batches.every(batch => batch.status === 'done')) return;
+  m.finalized = true;
+  try {
+    state.articles = dedupeAndRenumberArticles(state.articles);
+    const validation = runValidation();
+    renderResults();
+    setStatus(validation.allOk ? '完了' : '要確認');
+    state.running = false;
+    updateStartBtn();
+    await saveSession();
+    $('manualStatus').textContent = validation.allOk ? '全バッチ完了・検査合格' : '全バッチ完了・要確認';
+    log(`<strong>手動連携の全工程完了</strong> · 重複整理後 ${state.articles.length}件`, 'bold');
+    if ($('autoFinalize')?.checked && validation.allOk && !m.testOnly) {
+      const rows = buildMapRecordsFromCurrent();
+      const meta = parseNikkeiFilename(state.pdfFile?.name || '');
+      const filename = meta ? `${meta.isoDate.replaceAll('-', '')}${meta.edition}-data-1.json` : 'data-1.json';
+      downloadMapData(rows, filename);
+      log(`<strong>本番用JSONを自動保存</strong>: ${filename} (${rows.length}件)`, 'ok');
+    } else if (!validation.allOk) {
+      log('<strong>自動保存を停止</strong>: 品質検査に未合格の項目があります', 'err');
+    }
+  } catch (err) {
+    m.finalized = false;
+    state.running = false;
+    updateStartBtn();
+    setStatus('完了処理エラー');
+    log(`完了処理エラー: ${err.message}`, 'err');
+  }
 }
 
 // Test compatibility shim: showManualStep is no longer used in parallel mode,
@@ -3679,7 +3827,13 @@ function finishManualWorkflow() {
 // API extraction workflow
 // =====================================================================
 $('startBtn').addEventListener('click', () => {
-  if ($('runMode').value === 'manual') startManualWorkflow();
+  if ($('runMode').value === 'manual') {
+    if (state.manual?.prepared) {
+      $('manualSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    startManualWorkflow({ autoPrepare: true });
+  }
   else runExtraction({ resume: false });
 });
 $('testRunBtn').addEventListener('click', async () => {
@@ -3742,7 +3896,8 @@ async function runExtraction(opts = {}) {
   updateStartBtn();
 
   // Test mode: process only 1 page, batchSize=1
-  const userBatchSize = testOnly ? 1 : Math.max(2, parseInt($('batchSize').value) || 5);
+  const requestedBatchSize = Math.max(2, parseInt($('batchSize').value) || 5);
+  const userBatchSize = testOnly ? 1 : (state.preset === 'nikkei' ? Math.min(5, requestedBatchSize) : requestedBatchSize);
   const maxRetry = parseInt($('maxRetry').value) || 4;
   const enrich = state.schema.enrichFields && $('enrichFM').checked;
   const strict = $('strictMode').checked;
@@ -3835,7 +3990,12 @@ async function runExtraction(opts = {}) {
           try {
             const prompt = buildExtractionPrompt(startPage, endPage, startNo);
             const pages = range(startPage, endPage);
-            batch = await callGemini(prompt, extractionSchema, { pages });
+            const candidate = await callGemini(prompt, extractionSchema, { pages });
+            const qualityIssues = validateBatch(candidate, startNo, startPage, endPage);
+            if (strict && qualityIssues.length > 0) {
+              throw new Error(`品質検査不合格: ${qualityIssues.slice(0, 4).join(' / ')}`);
+            }
+            batch = candidate;
             break;
           } catch (err) {
             lastErr = err;
@@ -3913,6 +4073,13 @@ async function runExtraction(opts = {}) {
           }
         }
       }
+      if (state.preset === 'nikkei') {
+        const beforeDedup = state.articles.length;
+        state.articles = dedupeAndRenumberArticles(state.articles);
+        const removed = beforeDedup - state.articles.length;
+        log(`<strong>重複検査完了</strong>: ${removed}件を除外、${state.articles.length}件を採用`, removed > 0 ? 'warn' : 'ok');
+        await saveSession();
+      }
       log(`<strong>抽出フェーズ完了</strong>: 合計 ${state.articles.length}件`, 'bold');
     }
 
@@ -3936,7 +4103,12 @@ async function runExtraction(opts = {}) {
           try {
             const prompt = buildEnrichmentPrompt(slice, editionCode);
             const pages = slice.map(a => a.page).filter(Boolean);
-            enrichments = await callGemini(prompt, enrichSchema, { pages });
+            const candidate = await callGemini(prompt, enrichSchema, { pages });
+            const qualityIssues = validateEnrichmentBatch(candidate, slice);
+            if (strict && qualityIssues.length > 0) {
+              throw new Error(`深掘り品質検査不合格: ${qualityIssues.slice(0, 4).join(' / ')}`);
+            }
+            enrichments = candidate;
             break;
           } catch (err) {
             lastErr = err;
@@ -3978,7 +4150,7 @@ async function runExtraction(opts = {}) {
     }
 
     state.resume = null;
-    runValidation();
+    const validation = runValidation();
     renderResults();
     setStatus('完了');
     if (testOnly) {
@@ -4005,6 +4177,17 @@ async function runExtraction(opts = {}) {
       }, 300);
     } else {
       log(`<strong>全工程完了</strong> · ${state.articles.length}件抽出`, 'bold');
+      if ($('autoFinalize')?.checked) {
+        if (validation.allOk) {
+          const rows = buildMapRecordsFromCurrent();
+          const meta = parseNikkeiFilename(state.pdfFile?.name || '');
+          const filename = meta ? `${meta.isoDate.replaceAll('-', '')}${meta.edition}-data-1.json` : 'data-1.json';
+          downloadMapData(rows, filename);
+          log(`<strong>自動保存完了</strong>: ${filename} (${rows.length}件)`, 'ok');
+        } else {
+          log('<strong>自動保存を停止</strong>: 品質検査に未合格の項目があります', 'err');
+        }
+      }
     }
   } catch (err) {
     const stopped = err.message === 'STOPPED_BY_USER' || state.stopRequested;
@@ -4043,6 +4226,48 @@ function pageRangesFrom(startPage, total, batchSize) {
     p += batchSize;
   }
   return arr;
+}
+
+function normalizeDedupText(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s　「」『』【】（）()・,，.。:：;；!！?？\-—―]/g, '');
+}
+
+function dedupeAndRenumberArticles(records) {
+  const seen = new Set();
+  const deduped = [];
+  (records || []).forEach(record => {
+    const article = normalizeArticleRecord(record);
+    const headline = normalizeDedupText(article.headline || article.title || article['見出し']);
+    const detail = normalizeDedupText(article.content_detail || article['内容・詳細']).slice(0, 80);
+    const identity = headline || detail;
+    if (!identity || seen.has(identity)) return;
+    seen.add(identity);
+    deduped.push(article);
+  });
+  deduped.sort((a, b) => (Number(a.page) || 9999) - (Number(b.page) || 9999));
+  return deduped.map((article, index) => ({ ...article, no: index + 1 }));
+}
+
+function validateEnrichmentBatch(enrichments, sourceArticles) {
+  if (!Array.isArray(enrichments) || enrichments.length === 0) return ['深掘り結果が0件'];
+  const issues = [];
+  const byNo = new Map(enrichments.map(item => [Number(item.no), item]));
+  sourceArticles.forEach(article => {
+    const item = byNo.get(Number(article.no));
+    if (!item) {
+      issues.push(`No.${article.no}の深掘り結果が欠落`);
+      return;
+    }
+    (state.schema.enrichFields || []).forEach(field => {
+      if (item[field.key] === undefined || item[field.key] === null || item[field.key] === '') {
+        issues.push(`No.${article.no}: ${field.label}が空`);
+      }
+    });
+  });
+  return issues;
 }
 
 function shortErr(msg) {
@@ -4256,6 +4481,7 @@ function runValidation() {
   } else {
     $('vIssues').classList.add('hidden');
   }
+  return { allOk, checks };
 }
 
 // =====================================================================
@@ -4291,8 +4517,9 @@ function buildArticleIllustrationPrompt(article) {
   const title = firstArticleValue(article, ['headline', 'title', '見出し', '記事タイトル']);
   const genre = firstArticleValue(article, ['genre', 'category', 'ジャンル', 'カテゴリ']);
   const content = firstArticleValue(article, ['content_detail', '内容・詳細', '記事内容要約', '内容', 'summary']);
-  const intent = firstArticleValue(article, ['intention', 'thoughts', '思惑と狙い/本音', '思惑と狙い', '思惑']);
-  const lesson = firstArticleValue(article, ['understanding', '理解すべき内容', '記者が伝えたいこと', 'reporter_message']);
+  const changeMode = !!(article.change_direction && article.future_outlook) || article.analysis_mode === 'change-outlook-v1';
+  const intent = firstArticleValue(article, ['future_outlook', 'intent_motive', 'intention', 'thoughts', '思惑と狙い/本音', '思惑と狙い', '思惑']);
+  const lesson = firstArticleValue(article, ['change_direction', 'key_insights', 'understanding', '理解すべき内容', '記者が伝えたいこと', 'reporter_message']);
   const keyword = firstArticleValue(article, ['keyword', 'キーワード解説', 'keywords', '専門用語']);
   const page = firstArticleValue(article, ['page', 'ページ']);
 
@@ -4303,8 +4530,8 @@ function buildArticleIllustrationPrompt(article) {
 ジャンル: ${promptValue(genre) || '未分類'}
 PDFページ: ${promptValue(page) || '不明'}
 記事の要約: ${promptValue(content) || '要約情報なし'}
-背景・思惑: ${promptValue(intent) || '情報なし'}
-記者が伝えたいこと: ${promptValue(lesson) || '情報なし'}
+${changeMode ? '今後の展開予想（記事の見通しとAIの推測を区別）' : '背景・思惑'}: ${promptValue(intent) || '情報なし'}
+${changeMode ? '世の中の変化と方向性' : '記者が伝えたいこと'}: ${promptValue(lesson) || '情報なし'}
 既存の用語解説: ${promptValue(keyword) || '情報なし'}
 
 【イラストの必須条件】
@@ -4314,135 +4541,9 @@ PDFページ: ${promptValue(page) || '不明'}
 4. 高校生向けの教科書程度の分かりやすさと、落ち着いたニュース解説の見た目を両立する。人物、関係図、地図、金額や時系列など、内容に合う視覚表現を使う。
 5. スマートフォンでも読める大きさの文字にし、細かすぎる文章、過剰な装飾、無意味な余白を避ける。
 6. 「…」で文章を途中終了せず、すべての説明を完結させる。
-7. 記事情報にない数字・人物・因果関係を作らない。不明な点は「記事からは不明」と明記する。
+7. 記事の見通しとAIの推測の区別・条件を維持し、推測を確定事実として描かない。記事情報にない数字・人物・因果関係を作らない。不明な点は「記事からは不明」と明記する。
 8. 横長16:9の1枚画像として生成する。回答は解説文だけで終わらせず、必ずイラスト画像を生成する。`;
 }
-
-const pageIllustrationImages = new Map();
-
-function pageIllustrationPage(article) {
-  const raw = firstArticleValue(article, ['page', 'PDFページ', 'men', 'printedPage', 'ページ']);
-  const match = String(raw || '').match(/\d+/);
-  return match ? Number(match[0]) : null;
-}
-
-function pageIllustrationGroups() {
-  const groups = new Map();
-  state.articles.forEach(article => {
-    const page = pageIllustrationPage(article);
-    if (!Number.isFinite(page)) return;
-    if (!groups.has(page)) groups.set(page, []);
-    groups.get(page).push(article);
-  });
-  return [...groups.entries()].sort((a, b) => a[0] - b[0]);
-}
-
-function pageIllustrationSummary(article) {
-  const title = promptValue(firstArticleValue(article, ['headline', 'title', '見出し', '記事タイトル']));
-  const detail = promptValue(firstArticleValue(article, ['content_detail', '内容・詳細', '記事内容要約', '内容', 'summary']));
-  return `・${title || '見出しなし'}${detail ? `: ${detail}` : ''}`;
-}
-
-function buildPageIllustrationPrompt(page, articles) {
-  const articleText = (articles || []).map(pageIllustrationSummary).join('\n');
-  return `新聞の${page}面全体を、高校生でも理解でき、50代の日本人にも生活に役立つ、1枚の日本語解説イラストにしてください。
-
-【${page}面の記事】
-${articleText || '記事情報なし'}
-
-【イラストの必須条件】
-1. 個々の記事をばらばらに描くだけでなく、この面で重要な論点と記事同士のつながりが一目で分かる構成にする。
-2. 各記事は、短い見出しと完結した1文で要約する。「…」で文章を途中終了しない。
-3. 「この面で最も重要なこと」「なぜ重要か」「50代の生活・仕事・家計にどう役立つか」「今後注目する点」を明示する。
-4. 専門用語を1〜3語選び、高校生が初めて聞いても分かる平易な日本語で説明する。略語は正式名称も示す。
-5. 画像内の文章、見出し、注釈はすべて自然な日本語にする。スマートフォンでも読める文字サイズにする。
-6. 記事情報にない数字・人物・因果関係を作らない。不明な点は「記事からは不明」と明記する。
-7. 落ち着いたニュース図解として、関係図、地図、金額、時系列など内容に合う視覚表現を使う。
-8. 横長16:9の1枚画像として生成する。回答は解説文だけで終わらせず、必ずイラスト画像を生成する。`;
-}
-
-async function openPageIllustrationInGemini(page, button) {
-  const group = pageIllustrationGroups().find(([value]) => value === page);
-  if (!group) return;
-  const prompt = buildPageIllustrationPrompt(page, group[1]);
-  const popup = window.open('https://gemini.google.com/app', `gemini_page_illustration_${page}_${Date.now()}`);
-  const copied = await copyPromptText(prompt, `${page}面の解説イラスト指示文をコピーしました`);
-  if (button && copied) {
-    const original = button.textContent;
-    button.textContent = 'コピー済み・Geminiへ';
-    setTimeout(() => { button.textContent = original; }, 2500);
-  }
-  if (!popup) alert('Geminiを開けませんでした。ポップアップを許可してください。指示文はコピー済みです。');
-}
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(reader.error || new Error('画像を読み込めません'));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function registerPageIllustrationImage(page, file) {
-  if (!file || !String(file.type || '').startsWith('image/')) {
-    alert('画像ファイルを選択してください');
-    return;
-  }
-  const dataUrl = await fileToDataUrl(file);
-  if (!dataUrl.startsWith('data:image/')) throw new Error('画像データを読み込めません');
-  pageIllustrationImages.set(page, { fileName: file.name, mimeType: file.type || 'image/png', dataUrl });
-  renderPageIllustrationTools();
-}
-
-function renderPageIllustrationTools() {
-  const list = $('pageIllustrationList');
-  if (!list) return;
-  const groups = pageIllustrationGroups();
-  $('pageIllustrationCount').textContent = `${groups.length}面`;
-  list.innerHTML = groups.map(([page, articles]) => {
-    const image = pageIllustrationImages.get(page);
-    return `<div class="page-illustration-card" data-page="${page}">
-      <div class="page-illustration-card-title">${page}面</div>
-      <div class="page-illustration-card-note">${articles.length}記事${image ? ` / <span class="page-illustration-ready">画像登録済み: ${escapeHtml(image.fileName)}</span>` : ' / 画像未登録'}</div>
-      <div class="page-illustration-actions">
-        <button type="button" class="btn btn-secondary btn-sm page-illustration-generate" data-page="${page}">Geminiで生成</button>
-        <button type="button" class="btn btn-secondary btn-sm page-illustration-select" data-page="${page}">${image ? '画像を変更' : '画像を選択'}</button>
-        <input type="file" class="page-illustration-file" data-page="${page}" accept="image/png,image/jpeg,image/webp" hidden>
-      </div>
-    </div>`;
-  }).join('') || '<div class="page-illustration-card-note">面情報を含む記事がありません。</div>';
-  list.querySelectorAll('.page-illustration-generate').forEach(button => button.addEventListener('click', () => openPageIllustrationInGemini(Number(button.dataset.page), button)));
-  list.querySelectorAll('.page-illustration-select').forEach(button => button.addEventListener('click', () => list.querySelector(`.page-illustration-file[data-page="${button.dataset.page}"]`)?.click()));
-  list.querySelectorAll('.page-illustration-file').forEach(input => input.addEventListener('change', async () => {
-    try { await registerPageIllustrationImage(Number(input.dataset.page), input.files?.[0]); }
-    catch (error) { alert(error.message || error); }
-  }));
-  const exportButton = $('exportPageIllustrationPack');
-  if (exportButton) exportButton.disabled = pageIllustrationImages.size === 0;
-}
-
-function exportPageIllustrationPack() {
-  const date = mapDateKey($('mapDateInput')?.value);
-  if (!date) { alert('日経マップ更新欄で日付を指定してください'); return; }
-  const edition = $('mapEditionSelect')?.value || 'morning';
-  const items = [...pageIllustrationImages.entries()].sort((a, b) => a[0] - b[0]).map(([page, image]) => ({
-    date, edition, page, fileName: image.fileName, mimeType: image.mimeType, dataUrl: image.dataUrl, createdAt: new Date().toISOString()
-  }));
-  if (!items.length) { alert('面画像を1枚以上選択してください'); return; }
-  const payload = { format: 'nikkei-map-page-summary-images-v1', version: 1, items };
-  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `page-summary-images-${date.replace('/', '-')}-${edition}.json`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-$('exportPageIllustrationPack').addEventListener('click', exportPageIllustrationPack);
 
 async function openArticleIllustrationInGemini(articleIndex, button) {
   const article = state.articles[articleIndex];
@@ -4525,7 +4626,6 @@ function renderResults() {
       openArticleIllustrationInGemini(Number(button.dataset.articleIndex), button);
     });
   });
-  renderPageIllustrationTools();
   if (typeof updateMapIoStatus === 'function') updateMapIoStatus();
 }
 
@@ -4805,6 +4905,7 @@ function parseMapLocation(value) {
 
 function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
   const a = normalizeArticleRecord(article);
+  const analysis = mapAnalysisValues(a);
   const loc = parseMapLocation(a.map_json || a['地図の住所'] || a.location);
   const no = parseInt(a.no || a.No || idx + 1, 10) || idx + 1;
   const edition = MAP_ED_FROM_CODE[String(a.edition || '').toLowerCase()] || defaultEdition;
@@ -4819,8 +4920,9 @@ function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
     lat: loc.lat,
     lng: loc.lng,
     '内容': String(a.content_detail || a['内容・詳細'] || ''),
-    '思惑': String(a.intent_motive || a['思惑と狙い/本音'] || ''),
-    '理解': String(a.key_insights || a['理解すべき内容'] || ''),
+    '思惑': analysis.intent,
+    '理解': analysis.understanding,
+    ...(analysis.analysis_mode ? {analysis_mode:analysis.analysis_mode} : {}),
     quiz_q: String(a.quiz_q || a['クイズ（問）'] || ''),
     quiz_a: String(a.quiz_a || a['クイズ（解）'] || ''),
     quiz_kaisetsu: String(a.keyword || a['キーワード解説'] || ''),
@@ -4878,8 +4980,10 @@ function repairMapRecord(record, idx, fallbackDate = '', fallbackEdition = 'morn
   out.lat = Number.isFinite(parseFloat(out.lat)) ? parseFloat(out.lat) : loc.lat;
   out.lng = Number.isFinite(parseFloat(out.lng)) ? parseFloat(out.lng) : loc.lng;
   out['内容'] = String(out['内容'] || out.content_detail || out['内容・詳細'] || '');
-  out['思惑'] = String(out['思惑'] || out.intent_motive || out['思惑と狙い/本音'] || '');
-  out['理解'] = String(out['理解'] || out.key_insights || out['理解すべき内容'] || '');
+  const analysis = mapAnalysisValues(out);
+  out['思惑'] = analysis.intent;
+  out['理解'] = analysis.understanding;
+  if(analysis.analysis_mode) out.analysis_mode = analysis.analysis_mode;
   out.quiz_q = String(out.quiz_q || out['クイズ（問）'] || '');
   out.quiz_a = String(out.quiz_a || out['クイズ（解）'] || '');
   out.quiz_kaisetsu = String(out.quiz_kaisetsu || out.keyword || out['キーワード解説'] || '');
@@ -5166,3 +5270,4 @@ function showRestoreBanner(session) {
 </script>
 </body>
 </html>
+
