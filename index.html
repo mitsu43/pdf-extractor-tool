@@ -674,7 +674,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
   <div class="dropzone" id="dropzone">
     <div class="dz-icon">＋</div>
     <div class="dz-text">PDFファイルをここにドロップ<br>または クリックして選択</div>
-    <div class="dz-sub">日経新聞PDFの場合、ファイル名末尾 (m/e/r/p) から版種を自動判定</div>
+    <div class="dz-sub">日経新聞PDFは「朝刊.pdf / 夕刊.pdf / 地方版.pdf」で日付と版を自動設定（日付入りファイル名も対応）</div>
     <input type="file" id="fileInput" accept=".pdf,application/pdf" hidden>
   </div>
 </section>
@@ -1043,8 +1043,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.09.30.2';
-const APP_VERSION_NAME = '解説文章改善版';
+const APP_VERSION = 'v2026.10.02.2';
+const APP_VERSION_NAME = '日経マップ直接反映版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -2196,9 +2196,9 @@ async function handleFile(file) {
     alert('PDFファイルを選択してください');
     return;
   }
-  const nikkeiLike = /^\d{8}[merp]\.pdf$/i.test(file.name);
-  if (state.preset === 'nikkei' && !nikkeiLike) {
-    alert('日経新聞PDFのファイル名は、日本時間の日付8桁 + 版種で指定してください。\n例: 20260917m.pdf / 20260917e.pdf / 20260917r.pdf');
+  const nikkeiMeta = parseNikkeiFilename(file.name);
+  if (state.preset === 'nikkei' && !nikkeiMeta) {
+    alert('日経新聞PDFの版をファイル名から判定できません。\n\n毎日リネームしない形:\n朝刊.pdf / 夕刊.pdf / 地方版.pdf / プラス1.pdf\nまたは m.pdf / e.pdf / r.pdf / p.pdf\n\n従来の日付入り形式も使えます:\n20261002m.pdf / 20261002e.pdf / 20261002r.pdf');
     return;
   }
   // Warn for very large PDFs (>30MB) — iPad Safari may struggle
@@ -2251,22 +2251,42 @@ function renderPdfInfo() {
   `;
 }
 
-function detectEdition(filename) {
-  const base = filename.replace(/\.pdf$/i, '');
-  const last = base.slice(-1).toLowerCase();
-  if (['m','e','r','p'].includes(last)) return last;
-  return '?';
+function localIsoDate(now = new Date()) {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-function parseNikkeiFilename(filename) {
+function stableEditionFromFilename(filename) {
+  const base = String(filename || '').replace(/\.pdf$/i, '').trim();
+  const normalized = base.toLowerCase().replace(/[\s_\-]+/g, '');
+  const aliases = {
+    m: 'm', morning: 'm', '朝刊': 'm',
+    e: 'e', evening: 'e', '夕刊': 'e',
+    r: 'r', regional: 'r', local: 'r', '地方版': 'r',
+    p: 'p', plusone: 'p', plus1: 'p', 'プラス1': 'p', 'プラスワン': 'p',
+  };
+  return aliases[normalized] || null;
+}
+
+function detectEdition(filename) {
+  return parseNikkeiFilename(filename)?.edition || '?';
+}
+
+function parseNikkeiFilename(filename, today = new Date()) {
   const match = String(filename || '').match(/^(\d{4})(\d{2})(\d{2})([merp])\.pdf$/i);
-  if (!match) return null;
-  const [, year, month, day, edition] = match;
-  const isoDate = `${year}-${month}-${day}`;
-  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== Number(year)
-      || date.getUTCMonth() + 1 !== Number(month) || date.getUTCDate() !== Number(day)) return null;
-  return { isoDate, edition: edition.toLowerCase() };
+  if (match) {
+    const [, year, month, day, edition] = match;
+    const isoDate = `${year}-${month}-${day}`;
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== Number(year)
+        || date.getUTCMonth() + 1 !== Number(month) || date.getUTCDate() !== Number(day)) return null;
+    return { isoDate, edition: edition.toLowerCase() };
+  }
+  const edition = stableEditionFromFilename(filename);
+  if (!edition) return null;
+  return { isoDate: localIsoDate(today), edition };
 }
 
 function applyNikkeiFileMetadata(filename) {
@@ -5268,6 +5288,6 @@ function showRestoreBanner(session) {
   });
 }
 </script>
+<script src="map-publish.js?v=20261002-2"></script>
 </body>
 </html>
-
