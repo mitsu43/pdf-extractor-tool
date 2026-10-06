@@ -41,12 +41,13 @@ const prompt = context.buildArticleIllustrationPrompt({
 assert.match(html, /class="btn btn-secondary btn-sm article-illustration-btn"/);
 assert.match(html, /openArticleIllustrationInGemini\(Number\(button\.dataset\.articleIndex\), button\)/);
 assert.match(prompt, /金利上昇で住宅ローンに変化/);
-assert.match(prompt, /高校生でも内容を理解でき/);
-assert.match(prompt, /50代の生活・仕事・家計にどう役立つか/);
-assert.match(prompt, /高校生が初めて聞いても分かる/);
-assert.match(prompt, /専門用語の説明/);
-assert.match(prompt, /スマートフォンでも読める/);
-assert.match(prompt, /「…」で文章を途中終了せず/);
+assert.match(prompt, /中学生でも内容の段階を追って理解できる/);
+assert.match(prompt, /何が起きた？/);
+assert.match(prompt, /なぜそうなる？/);
+assert.match(prompt, /誰にどんな影響がある？/);
+assert.match(prompt, /専門用語を身近な物や行動に置き換え/);
+assert.match(prompt, /上段と下段に合計5〜7コマ/);
+assert.match(prompt, /途中で終わる「…」を使わない/);
 assert.match(prompt, /必ずイラスト画像を生成する/);
 assert.match(prompt, /政策金利は中央銀行/);
 

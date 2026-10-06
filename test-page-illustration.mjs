@@ -7,6 +7,6 @@ assert.doesNotMatch(html, /id="exportPageIllustrationPack"/);
 assert.doesNotMatch(html, /nikkei-map-page-summary-images-v1/);
 assert.doesNotMatch(html, /renderPageIllustrationTools\(\)/);
 assert.match(html, /class="btn btn-secondary btn-sm article-illustration-btn"/);
-assert.match(html, /高校生でも理解できる短い説明と図/);
+assert.match(html, /中学生でも内容の段階を追って理解できる/);
 
 console.log('device-local page illustration export removed; article illustration retained: OK');
