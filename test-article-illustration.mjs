@@ -63,7 +63,11 @@ for (const result of [prompt, bulk]) {
   assert.match(result, /ファイル名、拡張子、記事管理番号、パス、保存名の欄は画像内に絶対に描かない/);
   assert.match(result, /問いには必ず対応する答えと理由/);
   assert.match(result, /画像を実際に確認できない場合/);
-  assert.match(result, /日本語フォントで組版/);
+  assert.match(result, /納品物は実際の画像/);
+  assert.match(result, /利用可能な画像生成機能を使って/);
+  assert.match(result, /最初の記事の画像から生成/);
+  assert.match(result, /未生成の記事を大量の原稿で代用しない/);
+  assert.doesNotMatch(result, /合成できない場合は制約を報告/);
 }
 const [renderInput, metadata] = bulk.split('【保存用メタデータ：以下は描画エンジンへ渡す文字原稿に含めない】');
 assert.doesNotMatch(renderInput, /\.png|保存名:/);
