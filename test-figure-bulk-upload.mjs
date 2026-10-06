@@ -16,6 +16,8 @@ for (const id of [
 
 for (const behavior of [
   'function buildFigureQueue()',
+  'function buildBulkArticleIllustrationPrompt(queue, extraTheme)',
+  'function openBulkFigurePrompt()',
   'function assignFigureFiles(fileList)',
   'function figureNumberFromFilename(name)',
   'function figureManifestItems()',
@@ -25,7 +27,12 @@ for (const behavior of [
   '/api/figure-import/commit',
   'FIGURE_MAX_BATCH_BYTES = 80 * 1024 * 1024',
   '記事JSONとは別に保存します',
+  '全記事をまとめてGemini生成',
+  '英語、ローマ字、架空文字は禁止です',
 ]) assert.ok(html.includes(behavior), `missing behavior: ${behavior}`);
+
+assert.ok(!html.includes('function openNextFigurePrompt()'), 'one-article-at-a-time prompt flow must be removed');
+assert.ok(!html.includes('figurePromptCursor'), 'one-article-at-a-time cursor must be removed');
 
 assert.ok(html.includes('buildMapRecordsFromCurrent()'), 'queue must use canonical article gid conversion');
 assert.ok(html.includes('multiple'), 'image picker must accept multiple files');
