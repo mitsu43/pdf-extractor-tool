@@ -3,8 +3,8 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 
-assert.match(html, /const APP_VERSION = 'v2026\.10\.06\.2'/);
-assert.match(html, /const APP_VERSION_NAME = '日本語一括生成版'/);
+assert.match(html, /const APP_VERSION = 'v2026\.10\.06\.3'/);
+assert.match(html, /const APP_VERSION_NAME = '図解原稿校正版'/);
 assert.match(html, /id="appVersion"/);
 assert.match(html, /id="versionStatus">最新版を表示中/);
 assert.match(html, /id="updateToolBtn">最新版に更新/);
