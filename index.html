@@ -2268,6 +2268,7 @@ async function handleFile(file) {
     const proceed = confirm(`⚠ このPDFは ${sizeMB} MB と大きく、iPadのメモリを圧迫する可能性があります。\n\n対策:\n・小さいバッチサイズ（3〜5）で実行する\n・Macで「写真」アプリのPDFは画像が高解像度なので、可能なら別アプリで圧縮する\n\nこのまま続行しますか？`);
     if (!proceed) return;
   }
+  state.publishComplete = false;
   state.pdfFile = file;
   state.pageImageCache = new Map();
   try {
@@ -3069,6 +3070,7 @@ function startManualWorkflow(opts = {}) {
   const testOnly = !!opts.testOnly;
   const autoPrepare = opts.autoPrepare !== false;
   ensureDefaultEnrichSetting();
+  state.publishComplete = false;
   state.running = true;
   state.articles = [];
 
@@ -3090,6 +3092,7 @@ function startManualWorkflow(opts = {}) {
   }
   state.manual = {
     parallel: true,
+    sourceName: state.pdfFile?.name,
     batchSize,
     maxPages,
     testOnly,
@@ -3938,6 +3941,7 @@ async function runExtraction(opts = {}) {
   const isResume = opts.resume && state.resume;
   const testOnly = !!opts.testOnly;
   ensureDefaultEnrichSetting();
+  state.publishComplete = false;
   state.running = true;
   state.stopRequested = false;
   state._pdfModeLogged = false;
@@ -4212,6 +4216,7 @@ async function runExtraction(opts = {}) {
 
     state.resume = null;
     const validation = runValidation();
+    state.publishComplete = !testOnly && validation.allOk;
     renderResults();
     setStatus('完了');
     if (testOnly) {
@@ -5676,5 +5681,7 @@ function showRestoreBanner(session) {
   });
 }
 </script>
+<script src="./map-publish.js"></script>
 </body>
 </html>
+
