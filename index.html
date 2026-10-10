@@ -777,8 +777,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>分割バッチサイズ (ページ)</label>
       <input type="number" id="batchSize" value="5" min="2" max="5">
-      <label><input type="checkbox" id="wholePdfManual" checked> Gemini手動連携はPDF全体を1回で抽出</label>
-      <span class="desc">分割時・API実行時は最大5ページ。</span>
+      <span class="desc">Gemini手動連携・公開用PDFともに5ページずつ分割します。</span>
     </div>
     <div class="field">
       <label>呼出間隔（秒）</label>
@@ -881,11 +880,11 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
           📦 PDF分割とGemini入力をまとめて準備
         </div>
         <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: #6b6359; line-height: 1.7; margin-bottom: 10px;" id="bulkPrepDesc">
-          指示文の自動入力だけではPDFは添付されません。Gemini側に対象PDFを添付してから送信してください。全PDF対象の場合は元のPDFを1回添付します。
+          指示文の自動入力だけではPDFは添付されません。各バッチの分割PDFを、対応するGeminiタブに添付してから送信してください。
         </div>
         <div class="action-row" style="justify-content:flex-start; gap: 8px; flex-wrap: wrap; margin: 0;">
           <button class="btn btn-primary btn-sm" id="bulkPrepBtn">📦 全バッチを一括準備</button>
-          <button class="btn btn-secondary btn-sm" id="downloadAllBatchPdfsBtn" disabled>📎 分割PDF一括</button>
+          <button class="btn btn-secondary btn-sm" id="downloadAllBatchPdfsBtn" disabled>📎 公開用PDF（5ページずつ）</button>
           <button class="btn btn-secondary btn-sm" id="extensionGeminiBtn" disabled>🧩 Geminiへ自動入力</button>
           <button class="btn btn-secondary btn-sm" id="openAllGeminiTabsBtn" disabled>🚀 Geminiタブ一括</button>
           <button class="btn btn-secondary btn-sm" id="copyAllBatchPromptsBtn" disabled>📋 全指示文コピー</button>
@@ -1116,8 +1115,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.10.7';
-const APP_VERSION_NAME = 'PDF全体抽出・独立図解10記事一括生成';
+const APP_VERSION = 'v2026.10.10.9';
+const APP_VERSION_NAME = 'PDF5ページ分割・独立図解10記事一括生成';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -3109,8 +3108,7 @@ function startManualWorkflow(opts = {}) {
   state.running = true;
   state.articles = [];
 
-  const requestedBatchSize = parseInt($('batchSize').value) || 5;
-  const batchSize = testOnly ? 1 : ($('wholePdfManual').checked ? state.pdfPageCount : Math.min(5, requestedBatchSize));
+  const batchSize = testOnly ? 1 : 5;
   const maxPages = testOnly ? 1 : state.pdfPageCount;
   // Build batch definitions
   const batches = [];
@@ -3149,7 +3147,7 @@ function startManualWorkflow(opts = {}) {
   // Prompts and split-PDF download actions are ready immediately after upload.
   renderBatchGrid();
   $('manualStatus').textContent = autoPrepare ? `${batches.length}バッチ準備完了` : `${batches.length}バッチ準備待ち`;
-  if (autoPrepare) log(`📦 全 ${batches.length} バッチを5ページ以下で自動準備しました`, 'ok');
+  if (autoPrepare) log(`📦 抽出用 ${batches.length} バッチを準備しました。公開用PDFは別に5ページずつ分割します`, 'ok');
 }
 
 // Render all batch tiles (called whenever state changes)
@@ -3174,7 +3172,7 @@ function renderBatchGrid() {
   if (copyAllBatchPromptsBtn) {
     copyAllBatchPromptsBtn.disabled = !prepared;
   }
-  if (downloadAllBatchPdfsBtn) downloadAllBatchPdfsBtn.disabled = !prepared;
+  if (downloadAllBatchPdfsBtn) downloadAllBatchPdfsBtn.disabled = !state.pdfFile;
   if (extensionGeminiBtn) extensionGeminiBtn.disabled = !prepared;
 
   // Build tiles HTML
@@ -3405,16 +3403,25 @@ function openGeminiTabsWithExtension() {
 }
 
 async function downloadAllBatchPdfs() {
-  const m = state.manual;
-  if (!ensureManualPrepared() || !m?.batches?.length) return;
+  if (!state.pdfFile || !state.pdfPageCount) return;
+  // Publication ranges must not inherit the whole-PDF Gemini extraction setting.
+  const ranges = pageRangesFrom(1, state.pdfPageCount, 5);
   const btn = $('downloadAllBatchPdfsBtn');
   btn.disabled = true;
   const original = btn.textContent;
   let completed = 0;
   try {
-    for (const batch of m.batches) {
-      btn.textContent = `PDF作成 ${completed + 1}/${m.batches.length}`;
-      await downloadBatchPdf(batch.id);
+    for (const range of ranges) {
+      btn.textContent = `PDF作成 ${completed + 1}/${ranges.length}`;
+      const bytes = await splitPdfPages(range.startPage, range.endPage);
+      const baseName = (state.pdfFile.name || 'extracted.pdf').replace(/\.pdf$/i, '');
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseName}_P${range.startPage}-P${range.endPage}.pdf`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
       completed += 1;
       await new Promise(resolve => setTimeout(resolve, 350));
     }
