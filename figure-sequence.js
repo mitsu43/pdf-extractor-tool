@@ -69,8 +69,8 @@
       const progress=document.getElementById('figureSequenceProgress');
       const done=doneCount();
       if(progress){progress.max=figureRecords.length;progress.value=done;}
-      status.textContent=stop?`取込 ${done}/${figureRecords.length}件。停止済み。同じボタンで再開できます。`:`${done}件を10記事単位で自動取込しました。「まとめてサイト保存」で反映できます。`;
+      status.textContent=stop?`取込 ${done}/${figureRecords.length}件。停止済み。同じボタンで再開できます。`:`${done}件を取り込みました。「まとめてサイト保存」で反映できます。`;
     }catch(e){status.textContent='停止：'+e.message;figureLog(e.message,'warn');}
-    finally{running=false;start.disabled=false;start.textContent='10記事ずつ一括生成・再開';halt.disabled=true;locks.forEach(id=>document.getElementById(id).disabled=false);renderFigureQueue();}
+    finally{running=false;start.disabled=false;start.textContent='5記事ずつ一括生成・再開';halt.disabled=true;locks.forEach(id=>document.getElementById(id).disabled=false);renderFigureQueue();}
   };
 })();

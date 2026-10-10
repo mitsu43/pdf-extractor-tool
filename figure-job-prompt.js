@@ -3,9 +3,10 @@
   const visualRules=`【1記事1画像・縦4段の固定構図】
 Create exactly ONE vertically long image per article containing exactly FOUR horizontal panels stacked directly on top of each other: 起, 承, 転, 結. A single column only. DO NOT create side-by-side splits, galleries or separate images for the four panels.
 4段は白または黒の境界線で区切る。白背景、くっきりした黒い主線、やさしい手描きマンガ調、淡い配色。各段の上端には淡黄色の細い見出し帯を置く。
-【文字の例外は見出し帯だけ】
-各帯には段番号①〜④と、記事に即した短い日本語見出し（10字以内）を1つだけ置く。起承転結の段名を添えてよい。それ以外には文字・数字・英字・擬音語・吹き出し・注釈を描かない。看板、モニター、書類も文字なしの絵として描く。正式記事タイトル、ARTICLE_ID、ファイル名は画像外の本文にのみ出す。
-見出しは太く読みやすい標準的な日本語。架空の漢字・ふりがなを作らない。長文を縮めて詰め込まず、読みやすい短い言葉を選ぶ。小さな文字・短いラベルは見出し帯の範囲だけ可。日本語の正確性を確認し、確信のない語句は描かない。
+【短い日本語見出しとセリフ】
+各帯には段番号①〜④と、記事に即した短い日本語見出し（10字以内）を1つだけ置く。起承転結の段名を添えてよい。各コマには吹き出しを1つ置き、話している人物へ吹き出しの尾を向け、その人物が何を考え、何をしているかが伝わる短い日本語セリフ（原則15字以内・1文）を入れる。4コマのセリフをつなぐと出来事・仕組み・変化・注意点が理解できるようにする。記事に実際の発言がない場合は学習用の架空の説明役に話させ、実在人物の発言として創作しない。
+許可する文字は見出し帯と短いセリフだけ。長い説明、クイズ、擬音語、注釈は入れない。看板、モニター、書類も文字なしの絵として描く。正式記事タイトル、ARTICLE_ID、ファイル名は画像外の本文にのみ出す。
+描画前に全見出しとセリフの日本語を校正し、確定した文をそのまま描く。太く読みやすい標準的な日本語を使い、架空の漢字・ふりがなを作らない。長文を縮めて詰め込まず、吹き出しと文字の余白を確保する。数値・否定・条件を変えて短縮しない。文字崩れや不自然な日本語がないか生成後にも確認する。
 【各段の描画内容】
 起：誰が何に直面しているか。主語となる人物・組織と対象物を大きく描き、出来事・課題を表情と具体的な場面で見せる。
 承：誰が何をどう動かすか。道具、手の動き、目線、指差し、太い矢印で主語・行動・対象を物理的につなぐ。仕組みを文字ではなく具体物で示す。
@@ -32,7 +33,7 @@ ARTICLE_ID: ${a.gid}`;
     return {id,gid:a.gid,title:a.title,filename:root.FigurePrompt.imageFilename(a),prompt,explanation};
   }
   function makeBatchJob(records,theme='',id=crypto.randomUUID()) {
-    if(!records.length||records.length>10)throw new Error('1回の指示は1〜10記事です。');
+    if(!records.length||records.length>5)throw new Error('1回の指示は1〜5記事です。');
     const articles=records.map(a=>{
       if(!a.gid||!a.title)throw new Error('記事IDとタイトルが必要です。');
       return {gid:a.gid,title:a.title,filename:root.FigurePrompt.imageFilename(a)};
@@ -51,11 +52,11 @@ NIKKEI_JOB: ${id}`;
   }
   function makeBatchJobs(records,theme=''){
     const jobs=[];
-    for(let i=0;i<records.length;i+=10)jobs.push(makeBatchJob(records.slice(i,i+10),theme));
+    for(let i=0;i<records.length;i+=5)jobs.push(makeBatchJob(records.slice(i,i+5),theme));
     return jobs;
   }
   root.PdfFigurePrompt={makeJob,makeBatchJob,makeBatchJobs,makePrompt(records,theme){
     if(!records.length)throw new Error('対象記事がありません。');
-    return makeBatchJob(records.slice(0,10),theme).prompt;
+    return makeBatchJob(records.slice(0,5),theme).prompt;
   }};
 })(window);

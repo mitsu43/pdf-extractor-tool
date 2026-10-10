@@ -638,6 +638,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <table style="width:100%;border-collapse:collapse;text-align:left">
       <thead><tr><th>版 / 対象</th><th>変更内容</th><th>既存データ・再開</th></tr></thead>
       <tbody>
+        <tr><td>v2026.10.11.3 / 抽出ツール</td><td>新規の図解指示を5記事・独立5枚、各コマ短いセリフ付きに変更。</td><td>PDF再抽出不要。保存済みの10記事バッチは重複送信を避けるため維持。新規準備と手動コピーは5記事ずつ。</td></tr>
         <tr><td>v2026.10.11.2 / 抽出ツール</td><td>変更履歴・再開手順を表示。「最新版」の未確認表示を修正。</td><td>表示のみの変更。再抽出・画像の再生成は不要。</td></tr>
         <tr><td>v2026.10.11.1 / 抽出ツール</td><td>1記事1画像・縦4コマ、短い見出し帯と主語・行動・対象を指定する生成指示に変更。</td><td>記事JSONは再利用。新しい指示は次の生成に適用。既存画像は自動で変わりません。</td></tr>
         <tr><td>v2026.10.10.10 / 抽出ツール</td><td>完結JSONの続行誤判定、重複回答での取り込み停止を修正。</td><td>取得済み記事は保持。全件取得の確認ができた場合だけ「全件確認済み・完了にする」。</td></tr>
@@ -1071,7 +1072,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
           <span class="map-update-title">記事・4コマ・解説</span>
         </div>
         <div class="map-update-actions">
-          <button class="btn btn-primary btn-sm" id="startFigureSequenceBtn">10記事ずつ一括生成・自動取込</button>
+          <button class="btn btn-primary btn-sm" id="startFigureSequenceBtn">5記事ずつ一括生成・自動取込</button>
           <button class="btn btn-secondary btn-sm" id="stopFigureSequenceBtn" disabled>停止</button>
           <output id="figureSequenceStatus" role="status"></output>
           <button class="btn btn-primary btn-sm" id="publishFiguresBtn" disabled>まとめてサイト保存</button>
@@ -1082,7 +1083,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
       <details id="figureAdvanced"><summary>設定・手動取込・画像の確認</summary>
       <div class="map-update-actions">
           <button class="btn btn-secondary btn-sm" id="buildFigureQueueBtn">記事を確定し直す</button>
-          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>次の10記事の指示をコピー（手動）</button>
+          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>次の5記事の指示をコピー（手動）</button>
           <button class="btn btn-secondary btn-sm" id="importFigureConversationBtn">会話の画像をまとめて取り込む（手動）</button>
           <button class="btn btn-secondary btn-sm" id="selectFigureFilesBtn" disabled>画像ファイルを取り込む</button>
           <button class="btn btn-secondary btn-sm" id="downloadFigureManifestBtn" disabled>対応表JSON</button>
@@ -1132,8 +1133,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.11.2';
-const APP_VERSION_NAME = '変更履歴・再抽出不要条件・再開手順の表示';
+const APP_VERSION = 'v2026.10.11.3';
+const APP_VERSION_NAME = '新規図解5記事一括・短いセリフ付き';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -5414,7 +5415,7 @@ async function openBulkFigurePrompt() {
   const prompt = PdfFigurePrompt.makePrompt(selected,theme);
   const conversation=$('figureConversationInput').value.trim();
   if(conversation&&!/^https:\/\/gemini\.google\.com\/app\/[a-zA-Z0-9_-]+$/.test(conversation)){figureLog('Geminiの会話URLを確認してください。','warn');return;}
-  const targets=selected.slice(0,10);
+  const targets=selected.slice(0,5);
   const copied = await copyPromptText(prompt, `次の${targets.length}記事の指示をコピーしました`);
   let popup=true;
   try{await FigureGeminiBridge.open(conversation);}catch(error){
@@ -5423,7 +5424,7 @@ async function openBulkFigurePrompt() {
   }
   targets.forEach(target=>{figureQueue.find(a=>a.gid===target.gid).prompted=copied;});
   renderFigureQueue();
-  figureLog(`${targets.length}記事・独立${targets.length}枚の指示をコピーしました。自動処理は「10記事ずつ一括生成・自動取込」を使用してください。`, copied ? 'ok' : 'warn');
+  figureLog(`${targets.length}記事・独立${targets.length}枚のセリフ付き指示をコピーしました。自動処理は「5記事ずつ一括生成・自動取込」を使用してください。`, copied ? 'ok' : 'warn');
   if (!popup) alert('Geminiを開けませんでした。ポップアップを許可してください。指示文のコピー結果は下の状態欄で確認できます。');
 }
 
@@ -5850,9 +5851,9 @@ function showRestoreBanner(session) {
 <script src="figure-prompt.js?v=20261010-bundle1"></script>
 <script src="figure-zip.js?v=20261010-bundle1"></script>
 <script src="pdf-figure-prompt.js?v=20261010-pdf2"></script>
-<script src="figure-job-prompt.js?v=20261011-vertical-rules"></script>
+<script src="figure-job-prompt.js?v=20261011-five-dialogue"></script>
 <script src="figure-url-import.js?v=20261010-pdf2"></script>
 <script src="figure-gemini-bridge.js?v=20261010-batch10"></script>
-<script src="figure-sequence.js?v=20261010-batch10"></script>
+<script src="figure-sequence.js?v=20261011-five-dialogue"></script>
 </body>
 </html>
