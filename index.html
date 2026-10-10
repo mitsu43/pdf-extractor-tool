@@ -777,7 +777,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>分割バッチサイズ (ページ)</label>
       <input type="number" id="batchSize" value="5" min="2" max="5">
-      <span class="desc"><strong>新聞は最大5ページに固定</strong>。出力が切れた場合は自動でさらに分割します。</span>
+      <label><input type="checkbox" id="wholePdfManual" checked> Gemini手動連携はPDF全体を1回で抽出</label>
+      <span class="desc">分割時・API実行時は最大5ページ。</span>
     </div>
     <div class="field">
       <label>呼出間隔（秒）</label>
@@ -1056,7 +1057,10 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         </div>
         <div class="map-update-actions">
           <button class="btn btn-secondary btn-sm" id="buildFigureQueueBtn">1. 記事を確定</button>
-          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>2. PDF全体をGeminiへ</button>
+          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>図解指示をコピー</button>
+          <button class="btn btn-primary btn-sm" id="startFigureSequenceBtn">2. 全記事の図解を順次生成・再開</button>
+          <button class="btn btn-secondary btn-sm" id="stopFigureSequenceBtn" disabled>停止</button>
+          <output id="figureSequenceStatus" role="status"></output>
           <button class="btn btn-secondary btn-sm" id="importFigureConversationBtn">3. Geminiの生成結果を取り込む</button>
           <button class="btn btn-secondary btn-sm" id="selectFigureFilesBtn" disabled>画像ファイルを取り込む</button>
           <button class="btn btn-secondary btn-sm" id="downloadFigureManifestBtn" disabled>対応表JSON</button>
@@ -1108,8 +1112,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.10.2';
-const APP_VERSION_NAME = 'PDF全体・ZIP不要・生成タブ自動取込';
+const APP_VERSION = 'v2026.10.10.3';
+const APP_VERSION_NAME = 'PDF全体抽出・図解の順次生成';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -2940,11 +2944,13 @@ function makeManualPrompt(kind, payload) {
 【最重要：出力の完結性】
 回答が長くなる場合でも、必ず JSONを最後まで完結させてください（最後に \`]\` で閉じる）。
 - 文字数制限が来る前に、出力する記事数を減らしてでも、必ず完結したJSONで返すこと
-- 途中で「続きは後で」と切ることは絶対禁止
-- 全件が無理なら、最初に「全X件中Y件分を出力します」と明示してから、Y件のみを完結したJSONで返すこと
+- PDFの対象範囲から可能な限り多くの記事を1回で抽出する。件数を恣意的に3件や5件へ制限しない
+- 全件が収まらない場合は記事の区切りでJSON配列を閉じ、コードブロックの外に NEXT_NO: 次の番号 を1行だけ付ける
+- 対象範囲を全件確認して完了した場合だけコードブロックの外に EXTRACTION_COMPLETE を付ける
+- 続行時も完結したJSON配列を返し、既出記事の再出力・番号の振り直しをしない。画像生成・ZIP作成はこの段階では不要
 - 切れた状態のJSON（最後が \`]\` で終わらない）は不採用
 
-【重要】回答はJSONコードブロック1個だけで返してください。説明文、前置き、表、箇条書きは禁止です。
+【重要】回答はJSONコードブロック1個と上記の終了マーカーだけで返してください。説明文、前置き、表、箇条書きは禁止です。
 必ず \`\`\`json で開始し、\`\`\` で終了してください。
 【JSON破損防止】本文中にダブルクォート（"）を使わないでください。必要なら鉤括弧「」に置換してください。各値の中に改行を入れず、すべて1行の文字列にしてください。バックスラッシュも使わないでください。
 添付したPDF「${state.pdfFile?.name || ''}」を参照してください。PDFビューアの印字面番号ではなく、PDFの物理ページ番号を使ってください。`;
@@ -3040,7 +3046,7 @@ ${example}
 - pageは ${payload.startPage}〜${payload.endPage} の範囲内の元PDFページ番号
 - 添付PDFの全${pageCount}ページから記事を漏らさず抽出。広告・株価表のみ除外
 - 各記事ごとに全${allFields.length}項目すべて埋めること（${includeEnrich ? '記事内容要約、思惑、クイズ、地図JSON、版種まで' : ''}）
-- JSON配列を \`\`\`json のコードブロック1個だけで返す
+- JSON配列を \`\`\`json のコードブロック1個で返し、外に NEXT_NO: 次番号 または EXTRACTION_COMPLETE を必ず付ける
 - 文字列内のダブルクォートは使わず、鉤括弧「」に置換する。文字列内改行は禁止`;
   }
 
@@ -3077,7 +3083,7 @@ function startManualWorkflow(opts = {}) {
   state.articles = [];
 
   const requestedBatchSize = parseInt($('batchSize').value) || 5;
-  const batchSize = testOnly ? 1 : Math.min(5, requestedBatchSize);
+  const batchSize = testOnly ? 1 : ($('wholePdfManual').checked ? state.pdfPageCount : Math.min(5, requestedBatchSize));
   const maxPages = testOnly ? 1 : state.pdfPageCount;
   // Build batch definitions
   const batches = [];
@@ -3264,9 +3270,9 @@ function buildBatchPrompt(batchId) {
   const b = m?.batches?.[batchId];
   if (!b) return '';
   // Parallel batches are merged and renumbered later, so this is only a stable estimate for Gemini.
-  const startNo = (batchId * m.batchSize * 5) + 1;
+  const startNo = b.articles?.length ? Math.max(...b.articles.map(a=>Number(a.no)))+1 : (batchId * m.batchSize * 5) + 1;
   const editionCode = detectEdition(state.pdfFile?.name || '');
-  return makeManualPrompt('extract', {
+  return (b.articles?.length ? `同じPDFの続行です。既出${b.articles.length}件は再出力せず、no=${startNo}から再開してください。最後の記事：${JSON.stringify({no:b.articles.at(-1).no,page:b.articles.at(-1).page,title:b.articles.at(-1).headline||b.articles.at(-1).title})}\n\n` : '') + makeManualPrompt('extract', {
     startPage: b.startPage,
     endPage: b.endPage,
     startNo,
@@ -3453,25 +3459,29 @@ function importBatchJson(batchId, text) {
       throw new Error('JSON配列が空です');
     }
     // Detect truncation: did the input end with ] or }?
-    const trimmed = String(text).trim().replace(/```\s*$/i, '').trim();
-    const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}'));
+    const jsonPart = String(text).match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] || String(text);
+    const trimmed = jsonPart.trim();
+    const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}')) || /NEXT_NO\s*:\s*\d+/i.test(text) || !/EXTRACTION_COMPLETE/.test(text);
 
     const fieldsToValidate = state.schema.fields.concat(
       $('enrichFM')?.checked ? (state.schema.enrichFields || []).map(field => ({ ...field, required: true })) : []
     );
-    const provisionalStartNo = (batchId * m.batchSize * 5) + 1;
-    const issues = validateBatch(arr, provisionalStartNo, b.startPage, b.endPage, { fieldsToValidate });
+    const prior=b.articles||[];
+    const incoming=arr.filter(a=>!prior.some(p=>Number(p.no)===Number(a.no)&&(p.headline||p.title)===(a.headline||a.title)&&Number(p.page)===Number(a.page)));
+    if(!incoming.length)throw new Error('追加記事がありません。続きの指示文をコピーしてください。');
+    const provisionalStartNo = prior.length ? Math.max(...prior.map(a=>Number(a.no)))+1 : (batchId * m.batchSize * 5) + 1;
+    const issues = validateBatch(incoming, provisionalStartNo, b.startPage, b.endPage, { fieldsToValidate });
     if (issues.length > 0) {
       const preview = issues.slice(0, 5).join(' / ');
       throw new Error(`必須項目の不足: ${preview}${issues.length > 5 ? ` ほか${issues.length - 5}件` : ''}`);
     }
 
     // Store articles attached to this batch
-    b.articles = arr;
-    b.articleCount = arr.length;
+    b.articles = [...prior,...incoming];
+    b.articleCount = b.articles.length;
     b.status = wasTruncated ? 'error' : 'done';
     b.summary = wasTruncated
-      ? `⚠ 途中で切断: ${arr.length}件を救出 (バッチ未完了)`
+      ? `続行待ち：累計${b.articleCount}件。「指示文コピー」で同じ会話の続きを取得`
       : `✓ ${arr.length}件取り込み・厳格検査合格`;
     log(`✓ バッチ${batchId+1} (P${b.startPage}〜P${b.endPage}): ${b.articleCount}件取り込み${wasTruncated ? ' (切断)' : ''}`, wasTruncated ? 'warn' : 'ok');
 
@@ -3481,8 +3491,7 @@ function importBatchJson(batchId, text) {
     saveSession();
     if (!wasTruncated) completeManualWorkflowIfReady();
   } catch (err) {
-    b.articles = null;
-    b.articleCount = 0;
+    b.articleCount = b.articles?.length || 0;
     b.status = 'error';
     b.summary = `✕ 取り込みエラー: ${err.message}。Geminiに「JSON配列だけで再出力。本文中のダブルクォートは使わず、改行は入れない」と送って再貼り付けしてください`;
     log(`バッチ${batchId+1} 取り込みエラー: ${err.message}`, 'err');
@@ -3773,8 +3782,8 @@ if ($('importManualResponse')) {
       if (!Array.isArray(arr) || arr.length === 0) throw new Error('JSON配列が空です');
 
       // Detect if input was likely truncated (no closing ], or didn't end with } or ])
-      const trimmed = rawText.trim().replace(/```\s*$/i, '').trim();
-      const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}'));
+      const trimmed = (rawText.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] || rawText).trim();
+      const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}')) || /NEXT_NO\s*:\s*\d+/i.test(rawText);
     if (wasTruncated) {
       log(`⚠ JSONが途中で切れていましたが、${arr.length}件を救出しました。残りはもう一度Geminiに同じ指示を出して取り込んでください`, 'warn');
     }
@@ -5328,19 +5337,20 @@ async function openBulkFigurePrompt() {
   if (!figureQueue.length) buildFigureQueue();
   if (!figureQueue.length) return;
   const theme = $('figureExtraThemeInput').value.trim();
-  const selected=figureRecords;
+  const selected=figureRecords.filter(a=>!figureAssignments.some(x=>figureQueue[x.queueIndex]?.gid===a.gid));
+  if(!selected.length){figureLog('全記事の画像を取り込み済みです。','ok');return;}
   const prompt = PdfFigurePrompt.makePrompt(selected,theme);
   const conversation=$('figureConversationInput').value.trim();
   if(conversation&&!/^https:\/\/gemini\.google\.com\/app\/[a-zA-Z0-9_-]+$/.test(conversation)){figureLog('Geminiの会話URLを確認してください。','warn');return;}
-  const copied = await copyPromptText(prompt, `PDF全体の指示をコピーしました`);
+  const copied = await copyPromptText(prompt, `次の1記事の指示をコピーしました`);
   let popup=true;
   try{await FigureGeminiBridge.open(conversation);}catch(error){
     popup=window.open(conversation||'https://gemini.google.com/app','nikkei_figures_daily');
     figureLog(error.message,'warn');
   }
-  figureQueue.forEach(target => { target.prompted = copied; });
+  figureQueue.find(a=>a.gid===selected[0].gid).prompted=copied;
   renderFigureQueue();
-  figureLog(`PDF全体・${selected.length}記事の指示をコピーしました。Geminiへ貼り付けて送信後、会話URLから画像と説明を取り込めます。ZIP・画像生成APIは不要です。`, copied ? 'ok' : 'warn');
+  figureLog(`次の記事「${selected[0].title}」の指示をコピーしました。連続処理は「全記事の図解を順次生成・再開」を使用してください。`, copied ? 'ok' : 'warn');
   if (!popup) alert('Geminiを開けませんでした。ポップアップを許可してください。指示文のコピー結果は下の状態欄で確認できます。');
 }
 
@@ -5378,7 +5388,7 @@ async function assignFigureFiles(fileList) {
     const article=figureQueue[queueIndex];
     const metadata=file.geminiArticles?.find(a=>a.gid===article?.gid);
     if(metadata&&metadata.title!==article.title)throw new Error('記事タイトルが一致しません：'+metadata.title);
-    return {id:figureSafeId(), file, queueIndex, explanation:metadata?.explanation||file.geminiExplanation||'', theme:figureThemeFromFilename(file.name), createdAt:new Date().toISOString()};
+    return {id:figureSafeId(), file, queueIndex, explanation:metadata?.explanation||file.geminiExplanation||'', theme:encoded?'記事全体':figureThemeFromFilename(file.name), createdAt:new Date().toISOString()};
   });
   const totalBytes = nextAssignments.reduce((sum, item) => sum + item.file.size, 0);
   const replaced=new Set(nextAssignments.filter(a=>a.queueIndex>=0).map(a=>a.queueIndex));
@@ -5748,7 +5758,9 @@ function showRestoreBanner(session) {
 <script src="figure-prompt.js?v=20261010-bundle1"></script>
 <script src="figure-zip.js?v=20261010-bundle1"></script>
 <script src="pdf-figure-prompt.js?v=20261010-pdf2"></script>
+<script src="figure-job-prompt.js?v=20261010-sequence1"></script>
 <script src="figure-url-import.js?v=20261010-pdf2"></script>
-<script src="figure-gemini-bridge.js?v=20261010-pdf2"></script>
+<script src="figure-gemini-bridge.js?v=20261010-sequence1"></script>
+<script src="figure-sequence.js?v=20261010-sequence1"></script>
 </body>
 </html>
