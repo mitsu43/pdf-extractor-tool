@@ -1115,7 +1115,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.10.9';
+const APP_VERSION = 'v2026.10.10.10';
 const APP_VERSION_NAME = 'PDF5ページ分割・独立図解10記事一括生成';
 
 // =====================================================================
@@ -3196,7 +3196,8 @@ function renderBatchGrid() {
           <button class="btn btn-secondary btn-sm batch-pdf-btn" data-batch-id="${b.id}" ${pdfBtnDisabled}>📎 PDFダウンロード</button>
           <button class="btn btn-secondary btn-sm batch-prompt-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>📋 指示文コピー</button>
           <button class="btn btn-secondary btn-sm batch-gemini-btn" data-batch-id="${b.id}" ${promptBtnDisabled}>🚀 Geminiを開く</button>
-          ${b.status === 'done' || b.status === 'error' ? `<button class="btn btn-secondary btn-sm batch-clear-btn" data-batch-id="${b.id}">✕ クリア</button>` : ''}
+          ${b.status === 'review' ? `<button class="btn btn-secondary btn-sm batch-confirm-btn" data-batch-id="${b.id}">全件確認済み・完了にする</button>` : ''}
+          ${['done', 'error', 'review'].includes(b.status) ? `<button class="btn btn-secondary btn-sm batch-clear-btn" data-batch-id="${b.id}">✕ クリア</button>` : ''}
         </div>
         <textarea
           class="batch-paste"
@@ -3221,6 +3222,14 @@ function renderBatchGrid() {
   });
   grid.querySelectorAll('.batch-clear-btn').forEach(btn => {
     btn.addEventListener('click', () => clearBatch(parseInt(btn.dataset.batchId)));
+  });
+  grid.querySelectorAll('.batch-confirm-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const b = state.manual.batches[Number(btn.dataset.batchId)];
+      b.status = 'done';
+      b.summary = `✓ ${b.articleCount}件取り込み・対象範囲を全件確認済み`;
+      mergeBatchArticles(); renderBatchGrid(); saveSession(); completeManualWorkflowIfReady();
+    });
   });
   // Auto-import on paste/input — when user pastes JSON, import immediately
   grid.querySelectorAll('.batch-paste').forEach(ta => {
@@ -3495,15 +3504,26 @@ function importBatchJson(batchId, text) {
     }
     // Detect truncation: did the input end with ] or }?
     const jsonPart = String(text).match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] || String(text);
-    const trimmed = jsonPart.trim();
-    const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}')) || /NEXT_NO\s*:\s*\d+/i.test(text) || !/EXTRACTION_COMPLETE/.test(text);
+    const trimmed = jsonPart.replace(/\s*(?:EXTRACTION_COMPLETE|NEXT_NO\s*:\s*\d+)\s*$/i, '').trim();
+    const wasTruncated = !(trimmed.endsWith(']') || trimmed.endsWith('}')) || /NEXT_NO\s*:\s*\d+/i.test(text);
+    const explicitlyComplete = /EXTRACTION_COMPLETE/.test(text);
 
     const fieldsToValidate = state.schema.fields.concat(
       $('enrichFM')?.checked ? (state.schema.enrichFields || []).map(field => ({ ...field, required: true })) : []
     );
     const prior=b.articles||[];
     const incoming=arr.filter(a=>!prior.some(p=>Number(p.no)===Number(a.no)&&(p.headline||p.title)===(a.headline||a.title)&&Number(p.page)===Number(a.page)));
-    if(!incoming.length)throw new Error('追加記事がありません。続きの指示文をコピーしてください。');
+    if (!incoming.length) {
+      b.articleCount = prior.length;
+      if (!wasTruncated && b.status !== 'done') {
+        b.status = explicitlyComplete ? 'done' : 'review';
+        b.summary = explicitlyComplete ? `✓ ${prior.length}件取り込み・完了` : `取込済み：${prior.length}件。重複は追加していません。完了情報がないため対象範囲の全件確認が必要です`;
+      }
+      log(`バッチ${batchId+1}: 同じ記事${arr.length}件は取込済みです。既存記事を保持しました`, 'info');
+      mergeBatchArticles(); renderBatchGrid(); saveSession();
+      if (b.status === 'done') completeManualWorkflowIfReady();
+      return;
+    }
     const provisionalStartNo = prior.length ? Math.max(...prior.map(a=>Number(a.no)))+1 : (batchId * m.batchSize * 5) + 1;
     const issues = validateBatch(incoming, provisionalStartNo, b.startPage, b.endPage, { fieldsToValidate });
     if (issues.length > 0) {
@@ -3514,17 +3534,18 @@ function importBatchJson(batchId, text) {
     // Store articles attached to this batch
     b.articles = [...prior,...incoming];
     b.articleCount = b.articles.length;
-    b.status = wasTruncated ? 'error' : 'done';
+    b.status = wasTruncated ? 'error' : explicitlyComplete ? 'done' : 'review';
     b.summary = wasTruncated
       ? `続行待ち：累計${b.articleCount}件。「指示文コピー」で同じ会話の続きを取得`
-      : `✓ ${arr.length}件取り込み・厳格検査合格`;
+      : explicitlyComplete ? `✓ ${b.articleCount}件取り込み・厳格検査合格`
+      : `取込済み：${b.articleCount}件。JSONは正常です。完了情報がないため対象範囲の全件確認が必要です`;
     log(`✓ バッチ${batchId+1} (P${b.startPage}〜P${b.endPage}): ${b.articleCount}件取り込み${wasTruncated ? ' (切断)' : ''}`, wasTruncated ? 'warn' : 'ok');
 
     // Merge all completed batches into state.articles
     mergeBatchArticles();
     renderBatchGrid();  // Re-render to update colors/icons
     saveSession();
-    if (!wasTruncated) completeManualWorkflowIfReady();
+    if (b.status === 'done') completeManualWorkflowIfReady();
   } catch (err) {
     b.articleCount = b.articles?.length || 0;
     b.status = 'error';
@@ -3554,7 +3575,7 @@ function mergeBatchArticles() {
   if (!m) return;
   const all = [];
   m.batches.forEach(b => {
-    if ((b.status === 'done' || b.status === 'error') && Array.isArray(b.articles)) {
+    if (['done', 'error', 'review'].includes(b.status) && Array.isArray(b.articles)) {
       b.articles.forEach((a, idx) => {
         // Tag with batch id and within-batch order so sorting is stable
         all.push({ ...a, _batch: b.id, _order: idx });
