@@ -15,19 +15,20 @@
   }
   root.FigureGeminiBridge={async step(job){
     const ping=await exchange('ping',undefined,0,3000);
-    if(ping.extensionVersion!=='1.4.1')throw new Error('「日経マップ Gemini画像取込」拡張を再読み込みして1.4.1に更新し、このページも再読み込みしてください。');
-    return exchange('step',undefined,0,60000,job);
+    if(ping.extensionVersion!=='1.4.2')throw new Error('「日経マップ Gemini画像取込」拡張を再読み込みして1.4.2に更新し、このページも再読み込みしてください。');
+    return exchange('step',undefined,0,180000,job);
   },async open(url){
     const ping=await exchange('ping',undefined,0,3000);
-    if(!['1.3.0','1.4.0','1.4.1'].includes(ping.extensionVersion))throw new Error('拡張を1.4.1へ更新してください。');
+    if(!['1.3.0','1.4.0','1.4.1','1.4.2'].includes(ping.extensionVersion))throw new Error('拡張を1.4.2へ更新してください。');
     return exchange('open',url,0,10000);
-  },async request(url){
+  },async request(url,records=[]){
     const ping=await exchange('ping',url,0,3000);
-    if(!['1.3.0','1.4.0','1.4.1'].includes(ping.extensionVersion))throw new Error('Gemini画像取込拡張を1.4.1へ更新してください。');
+    if(!['1.3.0','1.4.0','1.4.1','1.4.2'].includes(ping.extensionVersion))throw new Error('Gemini画像取込拡張を1.4.2へ更新してください。');
     if(!url)url=(await exchange('resolve',undefined,0,5000)).url;
     const files=[];let offset=0;
+    const job=records.length?{importOnly:true,articles:records.map(a=>({gid:a.gid,title:a.title,filename:root.FigurePrompt.imageFilename(a)}))}:undefined;
     for(let batch=0;batch<1000;batch++){
-      const {pack}=await exchange('import',url,offset,180000);
+      const {pack}=await exchange('import',url,offset,180000,job);
       files.push(...root.FigureUrlImport.decode('NIKKEI_FIGURES_V1\n'+JSON.stringify(pack)));
       if(pack.nextOffset==null){files.conversationUrl=url;return files;}
       if(!Number.isInteger(pack.nextOffset)||pack.nextOffset<=offset)throw new Error('取込位置が進みません。');

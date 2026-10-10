@@ -23,43 +23,54 @@
       if(!figureQueue.length)throw new Error('先に記事を抽出してください。');
       const snapshot=JSON.stringify(figureRecords),theme=document.getElementById('figureExtraThemeInput').value.trim();
       const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(snapshot+'\n'+theme));
-      const key=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+      const key='batch-ten-v1:'+Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
       let queue=await access(key);
-      if(!queue){queue={jobs:figureRecords.map(a=>PdfFigurePrompt.makeJob(a,theme)),results:{}};await access(key,queue);}
+      if(!queue){
+        const pending=figureRecords.filter(a=>!figureAssignments.some(x=>figureQueue[x.queueIndex]?.gid===a.gid));
+        queue={jobs:PdfFigurePrompt.makeBatchJobs(pending,theme),results:{}};await access(key,queue);
+      }
+      const complete=a=>figureAssignments.some(x=>figureQueue[x.queueIndex]?.gid===a.gid);
+      const doneCount=()=>figureRecords.filter(complete).length;
       for(const job of queue.jobs){
         if(stop)break;
         if(JSON.stringify(figureRecords)!==snapshot)throw new Error('記事データが変更されました。停止しました。');
         const cached=queue.results[job.id]||await access(key+':'+job.id);
-        if(cached){await apply(cached);lock();continue;}
-        if(figureAssignments.some(a=>figureQueue[a.queueIndex]?.gid===job.gid))continue;
+        if(cached){
+          await apply(cached);lock();
+          if(!job.articles.every(complete))throw new Error('保存済みバッチに未取得記事があります。取得済み画像は保持しました。1記事ずつの再送はしません。');
+          continue;
+        }
+        if(job.articles.every(complete))continue;
         const began=Date.now();
         while(!stop){
           if(JSON.stringify(figureRecords)!==snapshot)throw new Error('記事データが変更されました。');
           lock();
-          const done=queue.jobs.filter(j=>figureAssignments.some(a=>figureQueue[a.queueIndex]?.gid===j.gid)).length;
+          const done=doneCount();
           const progress=document.getElementById('figureSequenceProgress');
-          if(progress){progress.max=queue.jobs.length;progress.value=done;}
-          status.textContent=`取込 ${done}/${queue.jobs.length}件 ／ 生成中：${job.title}`;
-          if(Date.now()-began>600000)throw new Error('10分以内に完了を確認できませんでした。取得済み画像は保持しています。同じボタンで再開できます。自動再送信はしません。');
+          if(progress){progress.max=figureRecords.length;progress.value=done;}
+          status.textContent=`取込 ${done}/${figureRecords.length}記事 ／ ${job.articles.length}記事を1回で生成中（独立${job.articles.length}枚）`;
+          if(Date.now()-began>1800000)throw new Error('30分以内にバッチ完了を確認できませんでした。取得済み画像は保持しています。同じボタンで再開できます。自動再送信はしません。');
           const result=await FigureGeminiBridge.step(job);
           if(result.url)document.getElementById('figureConversationInput').value=result.url;
           if(result.status==='done'){
             await access(key+':'+job.id,result.pack);
             await apply(result.pack);
             lock();
-            figureLog(`画像を取得・記事ID照合済み：${job.title}`,'ok');
+            const missing=job.articles.filter(a=>!complete(a));
+            if(missing.length)throw new Error(`${missing.length}記事が未取得です。取得済み画像は保持しました。1記事ずつの送信・自動再送はしません。対象：${missing.map(a=>a.gid).join(', ')}`);
+            figureLog(`${job.articles.length}枚を一括取得・記事ID照合済み`,'ok');
             break;
           }
-          if(result.status==='explaining')status.textContent=`取込 ${done}/${queue.jobs.length}件 ／ 画像は生成済み・説明だけ取得中：${job.title}`;
+          if(result.status==='explaining')status.textContent=`取込 ${done}/${figureRecords.length}件 ／ ${job.articles.length}記事の説明を取得中`;
           await sleep(4000);
         }
         if(!stop)await sleep(4000);
       }
       const progress=document.getElementById('figureSequenceProgress');
-      const done=queue.jobs.filter(j=>figureAssignments.some(a=>figureQueue[a.queueIndex]?.gid===j.gid)).length;
-      if(progress){progress.max=queue.jobs.length;progress.value=done;}
-      status.textContent=stop?`取込 ${done}/${queue.jobs.length}件。停止済み。同じボタンで再開できます。`:`${done}件を自動取込しました。「まとめてサイト保存」で反映できます。`;
+      const done=doneCount();
+      if(progress){progress.max=figureRecords.length;progress.value=done;}
+      status.textContent=stop?`取込 ${done}/${figureRecords.length}件。停止済み。同じボタンで再開できます。`:`${done}件を10記事単位で自動取込しました。「まとめてサイト保存」で反映できます。`;
     }catch(e){status.textContent='停止：'+e.message;figureLog(e.message,'warn');}
-    finally{running=false;start.disabled=false;start.textContent='全記事を一括生成・再開';halt.disabled=true;locks.forEach(id=>document.getElementById(id).disabled=false);renderFigureQueue();}
+    finally{running=false;start.disabled=false;start.textContent='10記事ずつ一括生成・再開';halt.disabled=true;locks.forEach(id=>document.getElementById(id).disabled=false);renderFigureQueue();}
   };
 })();
