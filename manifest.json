@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "日経マップ Gemini画像取込",
+  "version": "1.4.2",
+  "version_name": "1.4.2 アクセス修正版（2026-10-11）",
+  "description": "対象タブのURLを毎回検証。10記事単位の独立画像と起承転結説明を記事IDで照合。生成APIは使いません。",
+  "options_page": "diagnostics.html",
+  "permissions": ["scripting", "storage"],
+  "host_permissions": ["https://gemini.google.com/*"],
+  "background": {"service_worker": "background.mjs", "type": "module"},
+  "content_scripts": [{
+    "matches": ["https://nikkei-map.pages.dev/*", "https://mitsu43.github.io/pdf-extractor-tool/*", "http://127.0.0.1:8041/pdf-extractor-tool/*"],
+    "js": ["map-bridge.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }]
+}
