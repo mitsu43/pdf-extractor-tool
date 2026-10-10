@@ -629,9 +629,26 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
   </div>
   <div class="version-tools" aria-label="ツールのバージョン情報">
     <span class="version-badge" id="appVersion"></span>
-    <span class="version-status" id="versionStatus">最新版を表示中</span>
-    <button type="button" class="update-tool-btn" id="updateToolBtn">最新版に更新</button>
+    <span class="version-status" id="versionStatus">この画面の読込版（本番の最新版かは未確認）</span>
+    <button type="button" class="update-tool-btn" id="updateToolBtn">画面を再読み込み</button>
   </div>
+  <details style="margin-top:10px;line-height:1.8;font-size:13px">
+    <summary>変更履歴・再抽出が必要か・再開手順</summary>
+    <p><strong>今回の更新だけならPDFの再抽出は不要です。</strong>抽出済みJSONと画像はそのまま使えます。記事の欠落・誤抽出がある場合だけ、その範囲を確認・追加してください。</p>
+    <table style="width:100%;border-collapse:collapse;text-align:left">
+      <thead><tr><th>版 / 対象</th><th>変更内容</th><th>既存データ・再開</th></tr></thead>
+      <tbody>
+        <tr><td>v2026.10.11.2 / 抽出ツール</td><td>変更履歴・再開手順を表示。「最新版」の未確認表示を修正。</td><td>表示のみの変更。再抽出・画像の再生成は不要。</td></tr>
+        <tr><td>v2026.10.11.1 / 抽出ツール</td><td>1記事1画像・縦4コマ、短い見出し帯と主語・行動・対象を指定する生成指示に変更。</td><td>記事JSONは再利用。新しい指示は次の生成に適用。既存画像は自動で変わりません。</td></tr>
+        <tr><td>v2026.10.10.10 / 抽出ツール</td><td>完結JSONの続行誤判定、重複回答での取り込み停止を修正。</td><td>取得済み記事は保持。全件取得の確認ができた場合だけ「全件確認済み・完了にする」。</td></tr>
+        <tr><td>v2026.10.10.9 / 抽出ツール</td><td>PDF準備・公開用出力を5ページ単位に固定。</td><td>再抽出不要。27ページが1バッチの旧準備状態は、必要なら準備し直してください。公開用PDFは5ページずつ出力。</td></tr>
+        <tr><td>1.4.2 アクセス修正版（2026-10-11） / Chrome拡張</td><td>GeminiタブのURLを実行前に検証。別サイトに変わったタブへの誤アクセスを防止し、権限エラーを日本語表示。</td><td>抽出ツールとは別の版。拡張を再読み込み後「10記事ずつ一括生成・再開」。同じ記事・追加テーマなら保存済みバッチを再利用。Gemini側の生成成功は別途確認が必要。</td></tr>
+      </tbody>
+    </table>
+    <p><strong>再開手順：</strong>作業中は先に「今すぐ保存」。画面再読み込み後は「続きから再開」を選択。未抽出部分の抽出・PDF出力には元PDFを再選択してください（PDF本体・未送信の入力欄・バッチ画面は保存されません）。JSON書き出しと図解生成だけなら復元済み記事を使えます。「破棄して新規開始」は選ばないでください。</p>
+    <p><strong>保存範囲：</strong>復元は同じブラウザ・同じサイトの保存データがある場合です。ローカル版と本番版などURLの配信元が変わる場合は自動で移りません。記事JSONを保存して移してください。生成待ちのGemini会話は閉じず、追加テーマ・記事データを変えずに再開してください。</p>
+    <p><strong>検証範囲：</strong>分割PDFのページ数、JSON取り込み、10記事のバッチ処理、タブURL検証はコードテスト済み。今回の修正版によるGemini実画面から本番表示までの一連の成功は未確認です。表示版と本番反映・拡張再読み込み完了は別です。</p>
+  </details>
 </header>
 
 <!-- ============ Post-process existing files (cleanup tool) ============ -->
@@ -1115,8 +1132,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.11.1';
-const APP_VERSION_NAME = 'PDF5ページ分割・独立図解10記事一括生成';
+const APP_VERSION = 'v2026.10.11.2';
+const APP_VERSION_NAME = '変更履歴・再抽出不要条件・再開手順の表示';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -1448,12 +1465,12 @@ const updateToolButton = document.getElementById('updateToolBtn');
 const versionStatus = document.getElementById('versionStatus');
 const updateQuery = new URLSearchParams(location.search).get('tool-update');
 if (updateQuery) {
-  versionStatus.textContent = `${APP_VERSION} へ更新済み`;
+  versionStatus.textContent = `${APP_VERSION} を読込済み（本番の最新版かは未確認）`;
 }
 updateToolButton.addEventListener('click', async () => {
   updateToolButton.disabled = true;
   updateToolButton.textContent = '更新中...';
-  versionStatus.textContent = '最新版を読み込み中';
+  versionStatus.textContent = '配信されている画面を再読み込み中';
 
   if ('serviceWorker' in navigator) {
     try {
