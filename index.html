@@ -1051,13 +1051,14 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="figure-publish-panel">
       <div class="map-update-head">
         <div>
-          <span class="map-update-title">記事図解 一括反映</span>
-          <div class="map-update-note">記事JSONとは別に保存します。図解を追加しても本文・地図・読み上げデータは変更しません。</div>
+          <span class="map-update-title">記事・4コマ・解説</span>
+          <div class="map-update-note">記事を確定 → 紙面ごとにGemini生成 → ZIP取込 → 記事マップへ保存</div>
         </div>
         <div class="map-update-actions">
-          <button class="btn btn-secondary btn-sm" id="buildFigureQueueBtn">1. 図解一覧を作成</button>
-          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>2. 全記事をまとめてGemini生成</button>
-          <button class="btn btn-secondary btn-sm" id="selectFigureFilesBtn" disabled>3. 画像をまとめて選択</button>
+          <button class="btn btn-secondary btn-sm" id="buildFigureQueueBtn">1. 記事を確定</button>
+          <select id="figurePageSelect" aria-label="生成する紙面"></select>
+          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>2. この面をGeminiへ</button>
+          <button class="btn btn-secondary btn-sm" id="selectFigureFilesBtn" disabled>3. ZIP・画像を取り込む</button>
           <button class="btn btn-secondary btn-sm" id="downloadFigureManifestBtn" disabled>対応表JSON</button>
         </div>
       </div>
@@ -1065,6 +1066,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <div class="field">
           <label>追加テーマ（任意）</label>
           <input type="text" id="figureExtraThemeInput" placeholder="例: 円安の仕組みだけ">
+          <label for="figureConversationInput">Geminiの会話URL（同じ会話で続きを生成）</label>
+          <input type="url" id="figureConversationInput" placeholder="https://gemini.google.com/app/…">
         </div>
         <div class="field">
           <label>Cloudflare公開キー</label>
@@ -1072,14 +1075,14 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         </div>
         <div class="map-update-actions" style="align-items:end;">
           <button class="btn btn-secondary btn-sm" id="checkFigureConnectionBtn">接続確認</button>
-          <button class="btn btn-primary btn-sm" id="publishFiguresBtn" disabled>4. Cloudflareへ一括反映</button>
+          <button class="btn btn-primary btn-sm" id="publishFiguresBtn" disabled>4. 記事・図解・説明を保存</button>
+          <a class="btn btn-secondary btn-sm" href="https://nikkei-map.pages.dev/" target="nikkei_map">記事マップ</a>
           <button class="btn btn-secondary btn-sm" id="clearFigureFilesBtn" disabled>画像だけ解除</button>
         </div>
       </div>
-      <input class="figure-file-input" type="file" id="figureFilesInput" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple>
+      <input class="figure-file-input" type="file" id="figureFilesInput" accept=".zip,image/png,image/jpeg,image/webp" multiple>
       <div class="figure-drop" id="figureDropZone" tabindex="0" role="button" aria-label="生成画像をまとめて取り込む">
-        生成画像をここへまとめてドロップ、または「画像をまとめて選択」を押してください。<br>
-        ファイル名が「001-テーマ.png」の形なら記事番号へ自動対応し、それ以外は選択順で対応します。
+        GeminiのZIPをここへドロップ。記事ID・タイトル・面を照合し、画像と説明をまとめて取り込みます。画像のみの場合は取込先と説明を確認してください。
       </div>
       <div class="map-io-grid">
         <div class="map-io-card"><strong>対象記事</strong><div><output id="figureQueueCount">0</output> 件</div><div>選択中の日付・版から作成</div></div>
@@ -1104,8 +1107,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.06.4';
-const APP_VERSION_NAME = '図解画像出力修正版';
+const APP_VERSION = 'v2026.10.10.1';
+const APP_VERSION_NAME = '記事・4コマ・説明同時保存';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -5102,6 +5105,7 @@ function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
     cat: String(a.genre || a.category || a['ジャンル'] || ''),
     men: page,
     title: String(a.headline || a.title || a['見出し'] || ''),
+    body: String(a.body || a.original_text || a['記事本文'] || ''),
     place: loc.place,
     lat: loc.lat,
     lng: loc.lng,
@@ -5204,6 +5208,9 @@ const FIGURE_TOKEN_STORAGE_KEY = 'nikkeiFigurePublishToken';
 const FIGURE_MAX_BATCH_BYTES = 80 * 1024 * 1024;
 let figureQueue = [];
 let figureAssignments = [];
+let figureRecords = [];
+let figureFingerprint = '';
+let figureBusy = false;
 
 function figureLog(message, kind = '') {
   const el = $('figurePublishLog');
@@ -5241,6 +5248,7 @@ function figureManifestItems() {
       gid: target.gid,
       theme: item.theme || '記事全体',
       createdAt: item.createdAt || now,
+      explanation: item.explanation || '',
       article: {
         date: target.date,
         edition: target.edition,
@@ -5261,7 +5269,7 @@ function renderFigureQueue() {
   $('selectFigureFilesBtn').disabled = figureQueue.length === 0;
   $('clearFigureFilesBtn').disabled = figureAssignments.length === 0;
   $('downloadFigureManifestBtn').disabled = figureAssignments.length === 0;
-  const valid = figureAssignments.length > 0 && figureAssignments.every(item => item.queueIndex >= 0) && totalBytes <= FIGURE_MAX_BATCH_BYTES;
+  const valid = figureAssignments.length > 0 && figureAssignments.every(item => item.queueIndex >= 0 && item.explanation?.trim()) && totalBytes <= FIGURE_MAX_BATCH_BYTES && !figureBusy;
   $('publishFiguresBtn').disabled = !valid;
 
   if (!figureQueue.length) {
@@ -5276,7 +5284,7 @@ function renderFigureQueue() {
   $('figureQueueBody').innerHTML = figureAssignments.map((item, index) => `<tr>
     <td class="figure-file-name">${escapeHtml(item.file.name)}<br><small>${figureFormatBytes(item.file.size)}</small></td>
     <td><select data-figure-assignment="${index}" aria-label="${escapeHtml(item.file.name)}の取込先"><option value="-1">取込先を選択</option>${options}</select></td>
-    <td><input data-figure-theme="${index}" value="${escapeHtml(item.theme)}" aria-label="図解テーマ"></td>
+    <td><input data-figure-theme="${index}" value="${escapeHtml(item.theme)}" aria-label="図解テーマ"><textarea data-figure-explanation="${index}" rows="5" aria-label="4コマの説明" placeholder="Geminiの起承転結・用語解説を貼り付け">${escapeHtml(item.explanation||'')}</textarea></td>
     <td class="${item.queueIndex >= 0 ? 'figure-status-ok' : 'figure-status-warn'}">${item.queueIndex >= 0 ? '対応済み' : '要確認'}</td>
   </tr>`).join('');
   document.querySelectorAll('[data-figure-assignment]').forEach(select => {
@@ -5291,10 +5299,14 @@ function renderFigureQueue() {
     const index = Number(input.dataset.figureTheme);
     input.addEventListener('change', () => { figureAssignments[index].theme = input.value.trim() || '記事全体'; });
   });
+  document.querySelectorAll('[data-figure-explanation]').forEach(input=>input.addEventListener('change',()=>{figureAssignments[Number(input.dataset.figureExplanation)].explanation=input.value;renderFigureQueue();}));
 }
 
 function buildFigureQueue() {
   const records = buildMapRecordsFromCurrent();
+  if(figureAssignments.length&&!confirm('取り込み済みの画像を解除して、記事を再確定しますか？'))return;
+  figureRecords=records;
+  figureFingerprint=JSON.stringify(records);
   figureQueue = records.map((record, index) => ({
     no: record.no,
     gid: record.gid,
@@ -5307,24 +5319,55 @@ function buildFigureQueue() {
   }));
   figureAssignments = [];
   $('figureFilesInput').value = '';
+  const batches=[];
+  for(const page of [...new Set(records.map(a=>String(a.men)))].sort((a,b)=>Number(a)-Number(b))){
+    const list=records.filter(a=>String(a.men)===page);
+    for(let i=0;i<list.length;i+=10)batches.push({page,gids:list.slice(i,i+10).map(a=>a.gid),part:i/10+1});
+  }
+  window.figurePageBatches=batches;
+  $('figurePageSelect').innerHTML=batches.map((b,i)=>`<option value="${i}">${escapeHtml(b.page)}面${b.part>1?'・続き'+b.part:''}（${b.gids.length}記事）</option>`).join('');
   renderFigureQueue();
-  figureLog(`${figureQueue.length}記事の図解一覧を作成しました。記事JSONには変更を加えていません。`, 'ok');
+  figureLog(`${figureQueue.length}記事のID・タイトルを確定しました。紙面を選んでGeminiへ進めます。`, 'ok');
 }
 
 async function openBulkFigurePrompt() {
   if (!figureQueue.length) buildFigureQueue();
   if (!figureQueue.length) return;
   const theme = $('figureExtraThemeInput').value.trim();
-  const prompt = buildBulkArticleIllustrationPrompt(figureQueue, theme);
-  const popup = window.open('https://gemini.google.com/app', `gemini_figures_bulk_${Date.now()}`);
-  const copied = await copyPromptText(prompt, `${figureQueue.length}記事分の日本語図解指示を一括コピーしました`);
-  figureQueue.forEach(target => { target.prompted = copied; });
+  const batch=window.figurePageBatches[Number($('figurePageSelect').value)||0];
+  if(!batch)return;
+  const selected=figureRecords.filter(a=>batch.gids.includes(a.gid));
+  const prompt = FigurePrompt.makePrompt({date:selected[0].date,edition:selected[0].edition,page:batch.page,theme,articles:selected.map(a=>({gid:a.gid,no:a.no,title:a.title,body:a.body||'',summary:a['内容'],understanding:a['理解'],intent:a['思惑'],quiz:a.quiz_q,answer:a.quiz_a,reason:a.quiz_kaisetsu}))});
+  const conversation=$('figureConversationInput').value.trim();
+  if(conversation&&!/^https:\/\/gemini\.google\.com\/app\/[a-zA-Z0-9_-]+$/.test(conversation)){figureLog('Geminiの会話URLを確認してください。','warn');return;}
+  const popup = window.open(conversation||'https://gemini.google.com/app', 'nikkei_figures_daily');
+  const copied = await copyPromptText(prompt, `${batch.page}面の指示をコピーしました`);
+  figureQueue.filter(a=>batch.gids.includes(a.gid)).forEach(target => { target.prompted = copied; });
   renderFigureQueue();
-  figureLog(`${figureQueue.length}記事を1つの日本語指示文にまとめてGeminiで開きました。生成画像をまとめて保存し、次の手順で一括選択してください。`, copied ? 'ok' : 'warn');
+  figureLog(`${batch.page}面・${selected.length}記事の指示をコピーしました。Geminiへ貼り付けて送信し、生成されたZIPをここへ取り込んでください。画像生成APIは使いません。`, copied ? 'ok' : 'warn');
   if (!popup) alert('Geminiを開けませんでした。ポップアップを許可してください。指示文のコピー結果は下の状態欄で確認できます。');
 }
 
-function assignFigureFiles(fileList) {
+async function assignFigureFiles(fileList) {
+  if(figureBusy)return;
+  figureBusy=true;
+  try {
+  const zipFiles=[...fileList].filter(file=>/\.zip$/i.test(file.name));
+  if(zipFiles.length){
+    const imported=[];
+    for(const zip of zipFiles){
+      const result=await FigureZip.unpack(zip,figureRecords,a=>a.men);
+      for(const item of result.items){
+        await createImageBitmap(item.file).then(bitmap=>bitmap.close());
+        if(!item.explanation.trim())throw new Error('ZIPに4コマの説明がありません：'+item.article.title);
+        imported.push({id:figureSafeId(),file:item.file,queueIndex:figureQueue.findIndex(a=>a.gid===item.gid),theme:'記事全体',explanation:item.explanation});
+      }
+    }
+    const seen=new Set();for(const item of imported){if(seen.has(item.queueIndex))throw new Error('同じ記事の画像が重複しています');seen.add(item.queueIndex);}
+    figureAssignments=[...figureAssignments.filter(a=>!seen.has(a.queueIndex)),...imported];
+    figureLog(`${imported.length}記事の画像・説明を照合して取り込みました。保存すると本文も同時に反映されます。`,'ok');
+    return;
+  }
   const files = [...fileList].filter(file => String(file.type || '').startsWith('image/'));
   if (!files.length) {
     figureLog('画像ファイルがありません。PNG、JPEG、WebP、GIF、AVIFを選択してください。', 'warn');
@@ -5333,13 +5376,17 @@ function assignFigureFiles(fileList) {
   const nextAssignments = files.map((file, index) => {
     const articleNo = figureNumberFromFilename(file.name);
     let queueIndex = articleNo ? figureQueue.findIndex(item => Number(item.no) === articleNo) : -1;
-    if (queueIndex < 0 && index < figureQueue.length) queueIndex = index;
+    const encoded=file.name.match(/^\d{3,}__([^]+?)__/);
+    if(encoded){try{const gid=decodeURIComponent(encoded[1]);queueIndex=figureQueue.findIndex(a=>a.gid===gid&&Number(a.no)===articleNo);}catch{queueIndex=-1;}}
+    else queueIndex=-1;
     return {id:figureSafeId(), file, queueIndex, theme:figureThemeFromFilename(file.name), createdAt:new Date().toISOString()};
   });
   const totalBytes = nextAssignments.reduce((sum, item) => sum + item.file.size, 0);
-  figureAssignments = nextAssignments;
+  figureAssignments = [...figureAssignments,...nextAssignments];
   renderFigureQueue();
   figureLog(totalBytes > FIGURE_MAX_BATCH_BYTES ? `合計${figureFormatBytes(totalBytes)}です。80MB以下になるよう画像を分けてください。` : `${files.length}枚を取り込みました。記事との対応を下表で確認してください。`, totalBytes > FIGURE_MAX_BATCH_BYTES ? 'warn' : 'ok');
+  }catch(error){figureLog(`取込を中止しました：${error.message}。既存の取込内容は保持しています。`,'warn');}
+  finally{figureBusy=false;renderFigureQueue();}
 }
 
 function clearFigureFiles() {
@@ -5365,26 +5412,32 @@ async function checkFigureConnection() {
 }
 
 async function publishFigures() {
+  if(figureBusy)return;
+  if(JSON.stringify(buildMapRecordsFromCurrent())!==figureFingerprint){figureLog('記事・日付・版が変更されています。「記事を確定」からやり直してください。','warn');return;}
   const token = $('figurePublishTokenInput').value.trim();
   const items = figureManifestItems();
   const totalBytes = figureAssignments.reduce((sum, item) => sum + item.file.size, 0);
   if (!token) { figureLog('Cloudflare公開キーを入力してください。', 'warn'); return; }
   if (!items.length || items.length !== figureAssignments.length) { figureLog('取込先が未設定の画像があります。対応表を確認してください。', 'warn'); return; }
+  if(items.some(a=>!a.explanation.trim())){figureLog('すべての画像に4コマの説明が必要です。','warn');return;}
   if (totalBytes > FIGURE_MAX_BATCH_BYTES) { figureLog('画像合計が80MBを超えています。複数回に分けてください。', 'warn'); return; }
   const form = new FormData();
   form.append('manifest', JSON.stringify({version:1, items}));
+  const gids=new Set(items.map(a=>a.gid));
+  form.append('articles',JSON.stringify(figureRecords.filter(a=>gids.has(a.gid))));
   figureAssignments.forEach((assignment, index) => form.append(`image:${items[index].id}`, assignment.file, assignment.file.name));
-  $('publishFiguresBtn').disabled = true;
+  figureBusy=true;renderFigureQueue();
   figureLog(`${items.length}枚をCloudflareへ一括送信中…`);
   try {
-    const response = await fetch(`${FIGURE_API_BASE}/api/figure-import/commit`, {method:'POST', headers:{'X-Article-Publish-Token':token}, body:form});
+    const response = await fetch(`${FIGURE_API_BASE}/api/article-bundles/commit`, {method:'POST', headers:{'X-Article-Publish-Token':token}, body:form});
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
     localStorage.setItem(FIGURE_TOKEN_STORAGE_KEY, token);
-    figureLog(`${result.uploaded}枚を公開しました。日経マップは記事IDで自動表示します。公開済み総数: ${result.total}枚`, 'ok');
+    figureLog(`${result.articles}記事・${result.uploaded}枚・説明を一緒に保存しました。記事マップを再読み込みすると表示されます。次の面を選んで続けられます。`, 'ok');
   } catch (error) {
     figureLog(`一括反映に失敗しました: ${error.message || error}。画像と対応表は画面に保持しています。`, 'warn');
   } finally {
+    figureBusy=false;
     renderFigureQueue();
   }
 }
@@ -5409,6 +5462,8 @@ $('checkFigureConnectionBtn').addEventListener('click', checkFigureConnection);
 $('publishFiguresBtn').addEventListener('click', publishFigures);
 $('downloadFigureManifestBtn').addEventListener('click', downloadFigureManifest);
 $('figurePublishTokenInput').value = localStorage.getItem(FIGURE_TOKEN_STORAGE_KEY) || '';
+$('figureConversationInput').value=localStorage.getItem('nikkeiFigureConversation')||'';
+$('figureConversationInput').addEventListener('change',()=>localStorage.setItem('nikkeiFigureConversation',$('figureConversationInput').value.trim()));
 $('figurePublishTokenInput').addEventListener('change', () => localStorage.setItem(FIGURE_TOKEN_STORAGE_KEY, $('figurePublishTokenInput').value.trim()));
 ['dragenter','dragover'].forEach(type => $('figureDropZone').addEventListener(type, event => { event.preventDefault(); $('figureDropZone').classList.add('dragover'); }));
 ['dragleave','drop'].forEach(type => $('figureDropZone').addEventListener(type, event => { event.preventDefault(); $('figureDropZone').classList.remove('dragover'); }));
@@ -5676,5 +5731,8 @@ function showRestoreBanner(session) {
   });
 }
 </script>
+<script src="jszip.min.js"></script>
+<script src="figure-prompt.js?v=20261010-bundle1"></script>
+<script src="figure-zip.js?v=20261010-bundle1"></script>
 </body>
 </html>
