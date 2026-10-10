@@ -15,15 +15,15 @@
   }
   root.FigureGeminiBridge={async step(job){
     const ping=await exchange('ping',undefined,0,3000);
-    if(ping.extensionVersion!=='1.4.0')throw new Error('順次生成には「日経マップ Gemini画像取込」拡張1.4.0への更新が必要です。');
+    if(ping.extensionVersion!=='1.4.1')throw new Error('「日経マップ Gemini画像取込」拡張を再読み込みして1.4.1に更新し、このページも再読み込みしてください。');
     return exchange('step',undefined,0,60000,job);
   },async open(url){
     const ping=await exchange('ping',undefined,0,3000);
-    if(!['1.3.0','1.4.0'].includes(ping.extensionVersion))throw new Error('拡張を1.4.0へ更新してください。');
+    if(!['1.3.0','1.4.0','1.4.1'].includes(ping.extensionVersion))throw new Error('拡張を1.4.1へ更新してください。');
     return exchange('open',url,0,10000);
   },async request(url){
     const ping=await exchange('ping',url,0,3000);
-    if(!['1.3.0','1.4.0'].includes(ping.extensionVersion))throw new Error('Gemini画像取込拡張を1.4.0へ更新してください。');
+    if(!['1.3.0','1.4.0','1.4.1'].includes(ping.extensionVersion))throw new Error('Gemini画像取込拡張を1.4.1へ更新してください。');
     if(!url)url=(await exchange('resolve',undefined,0,5000)).url;
     const files=[];let offset=0;
     for(let batch=0;batch<1000;batch++){

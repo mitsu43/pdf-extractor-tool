@@ -1053,18 +1053,23 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
       <div class="map-update-head">
         <div>
           <span class="map-update-title">記事・4コマ・解説</span>
-          <div class="map-update-note">PDF全体 → Gemini生成 → 生成結果を取込 → 記事マップへ保存</div>
         </div>
         <div class="map-update-actions">
-          <button class="btn btn-secondary btn-sm" id="buildFigureQueueBtn">1. 記事を確定</button>
-          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>図解指示をコピー</button>
-          <button class="btn btn-primary btn-sm" id="startFigureSequenceBtn">2. 全記事の図解を順次生成・再開</button>
+          <button class="btn btn-primary btn-sm" id="startFigureSequenceBtn">全記事を一括生成・自動取込</button>
           <button class="btn btn-secondary btn-sm" id="stopFigureSequenceBtn" disabled>停止</button>
           <output id="figureSequenceStatus" role="status"></output>
-          <button class="btn btn-secondary btn-sm" id="importFigureConversationBtn">3. Geminiの生成結果を取り込む</button>
+          <button class="btn btn-primary btn-sm" id="publishFiguresBtn" disabled>まとめてサイト保存</button>
+          <a class="btn btn-secondary btn-sm" href="https://nikkei-map.pages.dev/" target="nikkei_map">記事マップ</a>
+        </div>
+      </div>
+      <progress id="figureSequenceProgress" value="0" max="1" style="width:100%;height:8px" aria-label="図解の取込進捗"></progress>
+      <details id="figureAdvanced"><summary>設定・手動取込・画像の確認</summary>
+      <div class="map-update-actions">
+          <button class="btn btn-secondary btn-sm" id="buildFigureQueueBtn">記事を確定し直す</button>
+          <button class="btn btn-secondary btn-sm" id="nextFigurePromptBtn" disabled>次の1記事の指示をコピー（手動）</button>
+          <button class="btn btn-secondary btn-sm" id="importFigureConversationBtn">会話の画像をまとめて取り込む（手動）</button>
           <button class="btn btn-secondary btn-sm" id="selectFigureFilesBtn" disabled>画像ファイルを取り込む</button>
           <button class="btn btn-secondary btn-sm" id="downloadFigureManifestBtn" disabled>対応表JSON</button>
-        </div>
       </div>
       <div class="figure-publish-grid">
         <div class="field">
@@ -1080,8 +1085,6 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         </div>
         <div class="map-update-actions" style="align-items:end;">
           <button class="btn btn-secondary btn-sm" id="checkFigureConnectionBtn">接続確認</button>
-          <button class="btn btn-primary btn-sm" id="publishFiguresBtn" disabled>4. 記事・図解・説明を保存</button>
-          <a class="btn btn-secondary btn-sm" href="https://nikkei-map.pages.dev/" target="nikkei_map">記事マップ</a>
           <button class="btn btn-secondary btn-sm" id="clearFigureFilesBtn" disabled>画像だけ解除</button>
         </div>
       </div>
@@ -1101,6 +1104,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         </table>
       </div>
       <div class="figure-publish-log" id="figurePublishLog">未準備</div>
+      </details>
     </div>
   </div>
 </section>
@@ -1112,7 +1116,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.10.3';
+const APP_VERSION = 'v2026.10.10.4';
 const APP_VERSION_NAME = 'PDF全体抽出・図解の順次生成';
 
 // =====================================================================
@@ -5279,7 +5283,7 @@ function renderFigureQueue() {
   $('selectFigureFilesBtn').disabled = figureQueue.length === 0;
   $('clearFigureFilesBtn').disabled = figureAssignments.length === 0;
   $('downloadFigureManifestBtn').disabled = figureAssignments.length === 0;
-  const valid = figureAssignments.length > 0 && figureAssignments.every(item => item.queueIndex >= 0 && item.explanation?.trim()) && totalBytes <= FIGURE_MAX_BATCH_BYTES && !figureBusy;
+  const valid = figureAssignments.some(item => item.queueIndex >= 0 && item.explanation?.trim()) && !figureBusy;
   $('publishFiguresBtn').disabled = !valid;
 
   if (!figureQueue.length) {
@@ -5394,7 +5398,7 @@ async function assignFigureFiles(fileList) {
   const replaced=new Set(nextAssignments.filter(a=>a.queueIndex>=0).map(a=>a.queueIndex));
   figureAssignments = [...figureAssignments.filter(a=>!replaced.has(a.queueIndex)),...nextAssignments];
   renderFigureQueue();
-  figureLog(totalBytes > FIGURE_MAX_BATCH_BYTES ? `合計${figureFormatBytes(totalBytes)}です。80MB以下になるよう画像を分けてください。` : `${files.length}枚を取り込みました。記事との対応を下表で確認してください。`, totalBytes > FIGURE_MAX_BATCH_BYTES ? 'warn' : 'ok');
+  figureLog(`${files.length}枚を取り込みました。合計${figureFormatBytes(totalBytes)}。保存時は容量・件数に応じて自動分割します。`, 'ok');
   }catch(error){figureLog(`取込を中止しました：${error.message}。既存の取込内容は保持しています。`,'warn');}
   finally{figureBusy=false;renderFigureQueue();}
 }
@@ -5421,31 +5425,50 @@ async function checkFigureConnection() {
   }
 }
 
+function figureUploadBatches(assignments) {
+  const batches=[];let batch=[],bytes=0;
+  for(let i=0;i<assignments.length;i++){
+    const size=assignments[i].file.size;
+    if(size>20*1024*1024)throw new Error('1枚20MBを超える画像があります。');
+    if(batch.length&&(batch.length>=100||bytes+size>75*1024*1024)){batches.push(batch);batch=[];bytes=0;}
+    batch.push(i);bytes+=size;
+  }
+  if(batch.length)batches.push(batch);
+  return batches;
+}
+
 async function publishFigures() {
   if(figureBusy)return;
   if(JSON.stringify(buildMapRecordsFromCurrent())!==figureFingerprint){figureLog('記事・日付・版が変更されています。「記事を確定」からやり直してください。','warn');return;}
   const token = $('figurePublishTokenInput').value.trim();
-  const items = figureManifestItems();
-  const totalBytes = figureAssignments.reduce((sum, item) => sum + item.file.size, 0);
-  if (!token) { figureLog('Cloudflare公開キーを入力してください。', 'warn'); return; }
-  if (!items.length || items.length !== figureAssignments.length) { figureLog('取込先が未設定の画像があります。対応表を確認してください。', 'warn'); return; }
+  const items = figureManifestItems().filter(item=>item.explanation.trim());
+  const assignments=items.map(item=>figureAssignments.find(a=>a.id===item.id));
+  const pending=figureAssignments.length-assignments.length;
+  if (!token) { $('figureAdvanced').open=true;$('figurePublishTokenInput').focus();$('figureSequenceStatus').textContent='設定内のCloudflare公開キーを入力してください。';figureLog('Cloudflare公開キーを入力してください。', 'warn'); return; }
+  if (!items.length) { $('figureAdvanced').open=true;figureLog('記事と説明が確認済みの画像がありません。対応表を確認してください。', 'warn'); return; }
   if(items.some(a=>!a.explanation.trim())){figureLog('すべての画像に4コマの説明が必要です。','warn');return;}
-  if (totalBytes > FIGURE_MAX_BATCH_BYTES) { figureLog('画像合計が80MBを超えています。複数回に分けてください。', 'warn'); return; }
-  const form = new FormData();
-  form.append('manifest', JSON.stringify({version:1, items}));
-  const gids=new Set(items.map(a=>a.gid));
-  form.append('articles',JSON.stringify(figureRecords.filter(a=>gids.has(a.gid))));
-  figureAssignments.forEach((assignment, index) => form.append(`image:${items[index].id}`, assignment.file, assignment.file.name));
+  const batches=figureUploadBatches(assignments);
   figureBusy=true;renderFigureQueue();
   figureLog(`${items.length}枚をCloudflareへ一括送信中…`);
   try {
-    const response = await fetch(`${FIGURE_API_BASE}/api/article-bundles/commit`, {method:'POST', headers:{'X-Article-Publish-Token':token}, body:form});
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    let uploaded=0;
+    for(const indices of batches){
+      const selected=indices.map(i=>items[i]),gids=new Set(selected.map(a=>a.gid));
+      const form=new FormData();form.append('manifest',JSON.stringify({version:1,items:selected}));
+      form.append('articles',JSON.stringify(figureRecords.filter(a=>gids.has(a.gid))));
+      for(const i of indices)form.append(`image:${items[i].id}`,assignments[i].file,assignments[i].file.name);
+      $('figureSequenceStatus').textContent=`サイト保存 ${uploaded}/${items.length}枚`;
+      const response=await fetch(`${FIGURE_API_BASE}/api/article-bundles/commit`,{method:'POST',headers:{'X-Article-Publish-Token':token},body:form});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok||!result.ok)throw new Error(`${uploaded}枚は保存済み。${result.error||`HTTP ${response.status}`}`);
+      uploaded+=result.uploaded;
+    }
     localStorage.setItem(FIGURE_TOKEN_STORAGE_KEY, token);
-    figureLog(`${result.articles}記事・${result.uploaded}枚・説明を一緒に保存しました。記事マップを再読み込みすると表示されます。`, 'ok');
+    $('figureSequenceStatus').textContent=`${uploaded}枚と記事・説明をサイトに保存しました。`+(pending?` 未対応・説明未取得の${pending}枚は公開せず、設定内に保持しています。`:'');
+    figureLog(`${uploaded}枚・記事・説明を保存しました。記事マップを再読み込みすると表示されます。`, 'ok');
   } catch (error) {
     figureLog(`一括反映に失敗しました: ${error.message || error}。画像と対応表は画面に保持しています。`, 'warn');
+    $('figureSequenceStatus').textContent=`保存停止：${error.message}。取込画像は保持しています。`;
   } finally {
     figureBusy=false;
     renderFigureQueue();
