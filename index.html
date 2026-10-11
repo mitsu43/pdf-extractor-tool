@@ -638,6 +638,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <table style="width:100%;border-collapse:collapse;text-align:left">
       <thead><tr><th>版 / 対象</th><th>変更内容</th><th>既存データ・再開</th></tr></thead>
       <tbody>
+        <tr><td>v2026.10.11.6 / 自動続行</td><td>5記事ずつ生成→説明取得→取り込み→次の5記事。完了後サイト保存を選択可能。</td><td>再抽出不要。取り込み済み5枚は除外。「開始・続きから再開」で残りを処理。不足・受信不明は自動再送しない。</td></tr>
         <tr><td>v2026.10.11.5 / 抽出ツール＋拡張の送信受信確認修正版</td><td>送信ボタン操作とGemini受信確認を分離。ジョブIDまたは指示全文の完全一致で照合。</td><td>PDF再抽出不要。送信結果が不明なら自動再送せず保持。空の新規会話を送信成功と扱わない。</td></tr>
         <tr><td>v2026.10.11.4 / 抽出ツール＋拡張の部分取込修正版</td><td>5記事中3枚などの部分生成でも、記事IDを照合できた画像を先に取り込む。不足分だけの指示コピーを追加。</td><td>PDF再抽出不要。画像の自動再生成はしない。説明がない画像は説明未取得として保持。拡張と抽出画面の両方を更新する必要あり。</td></tr>
         <tr><td>v2026.10.11.3 / 抽出ツール</td><td>新規の図解指示を5記事・独立5枚、各コマ短いセリフ付きに変更。</td><td>PDF再抽出不要。保存済みの10記事バッチは重複送信を避けるため維持。新規準備と手動コピーは5記事ずつ。</td></tr>
@@ -1074,8 +1075,9 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
           <span class="map-update-title">記事・4コマ・解説</span>
         </div>
         <div class="map-update-actions">
-          <button class="btn btn-primary btn-sm" id="startFigureSequenceBtn">5記事ずつ一括生成・自動取込</button>
+          <button class="btn btn-primary btn-sm" id="startFigureSequenceBtn">開始・続きから再開（5記事ずつ自動）</button>
           <button class="btn btn-secondary btn-sm" id="stopFigureSequenceBtn" disabled>停止</button>
+          <label><input type="checkbox" id="autoPublishFigures" checked> 完了後サイト保存</label>
           <output id="figureSequenceStatus" role="status"></output>
           <button class="btn btn-secondary btn-sm" id="copyMissingFigurePromptBtn" hidden>不足記事だけの指示をコピー</button>
           <button class="btn btn-primary btn-sm" id="publishFiguresBtn" disabled>まとめてサイト保存</button>
@@ -1136,8 +1138,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.11.5';
-const APP_VERSION_NAME = '送信操作と受信確認を分離・部分画像保持';
+const APP_VERSION = 'v2026.10.11.6';
+const APP_VERSION_NAME = '5記事ずつ自動続行・取込済み除外・完了後保存';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -5857,6 +5859,6 @@ function showRestoreBanner(session) {
 <script src="figure-job-prompt.js?v=20261011-five-dialogue"></script>
 <script src="figure-url-import.js?v=20261010-pdf2"></script>
 <script src="figure-gemini-bridge.js?v=20261010-batch10"></script>
-<script src="figure-sequence.js?v=20261011-send-confirmation"></script>
+<script src="figure-sequence.js?v=20261011-auto-continue"></script>
 </body>
 </html>

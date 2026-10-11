@@ -50,13 +50,13 @@
       for(const job of queue.jobs){
         if(stop)break;
         if(JSON.stringify(figureRecords)!==snapshot)throw new Error('記事データが変更されました。停止しました。');
+        if(job.articles.every(complete))continue;
         const cached=queue.results[job.id]||await access(key+':'+job.id);
         if(cached){
           await apply(cached);lock();
           partialStop(job,complete);
           continue;
         }
-        if(job.articles.every(complete))continue;
         const began=Date.now();
         while(!stop){
           if(JSON.stringify(figureRecords)!==snapshot)throw new Error('記事データが変更されました。');
@@ -66,7 +66,7 @@
           if(progress){progress.max=figureRecords.length;progress.value=done;}
           status.textContent=`取込 ${done}/${figureRecords.length}記事 ／ ${job.articles.length}記事を1回で生成中（独立${job.articles.length}枚）`;
           if(Date.now()-began>1800000)throw new Error('30分以内にバッチ完了を確認できませんでした。取得済み画像は保持しています。同じボタンで再開できます。自動再送信はしません。');
-          const result=await FigureGeminiBridge.step(job);
+          const result=await FigureGeminiBridge.step(job,document.getElementById('figureConversationInput').value.trim());
           if(result.status==='send-attempted')status.textContent=`${job.articles.length}記事の送信を操作しました。Geminiの受信確認待ちです（生成成功は未確認）。`;
           if(result.url)document.getElementById('figureConversationInput').value=result.url;
           if(result.status==='done'){
@@ -87,7 +87,10 @@
       const done=doneCount();
       if(progress){progress.max=figureRecords.length;progress.value=done;}
       status.textContent=stop?`取込 ${done}/${figureRecords.length}件。停止済み。同じボタンで再開できます。`:`${done}件を取り込みました。「まとめてサイト保存」で反映できます。`;
+      if(!stop&&done===figureRecords.length&&document.getElementById('autoPublishFigures').checked){
+        await publishFigures();
+      }
     }catch(e){status.textContent='停止：'+e.message;figureLog(e.message,'warn');}
-    finally{running=false;start.disabled=false;start.textContent='5記事ずつ一括生成・再開';halt.disabled=true;locks.forEach(id=>document.getElementById(id).disabled=false);renderFigureQueue();}
+    finally{running=false;start.disabled=false;start.textContent='開始・続きから再開（5記事ずつ自動）';halt.disabled=true;locks.forEach(id=>document.getElementById(id).disabled=false);renderFigureQueue();}
   };
 })();

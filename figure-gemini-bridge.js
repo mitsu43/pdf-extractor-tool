@@ -13,10 +13,10 @@
       root.postMessage({channel:'nikkei-gemini-request-v1',id,type,url,offset,job},location.origin);
     });
   }
-  root.FigureGeminiBridge={async step(job){
+  root.FigureGeminiBridge={async step(job,url){
     const ping=await exchange('ping',undefined,0,3000);
     if(ping.extensionVersion!=='1.4.2')throw new Error('「日経マップ Gemini画像取込」拡張を再読み込みして1.4.2に更新し、このページも再読み込みしてください。');
-    return exchange('step',undefined,0,180000,job);
+    return exchange('step',url||undefined,0,180000,job);
   },async open(url){
     const ping=await exchange('ping',undefined,0,3000);
     if(!['1.3.0','1.4.0','1.4.1','1.4.2'].includes(ping.extensionVersion))throw new Error('拡張を1.4.2へ更新してください。');
