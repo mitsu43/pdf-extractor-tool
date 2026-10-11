@@ -638,6 +638,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <table style="width:100%;border-collapse:collapse;text-align:left">
       <thead><tr><th>版 / 対象</th><th>変更内容</th><th>既存データ・再開</th></tr></thead>
       <tbody>
+        <tr><td>v2026.10.11.7 / 画像照合修正</td><td>画像の直前に記事IDがない場合、Geminiに既存画像の内容と記事の対応を確認させて取り込む。読み取りエラーの詳細を表示。</td><td>再抽出・画像再生成不要。拡張を再読み込みし「開始・続きから再開」。画像は保持。</td></tr>
         <tr><td>v2026.10.11.6 / 自動続行</td><td>5記事ずつ生成→説明取得→取り込み→次の5記事。完了後サイト保存を選択可能。</td><td>再抽出不要。取り込み済み5枚は除外。「開始・続きから再開」で残りを処理。不足・受信不明は自動再送しない。</td></tr>
         <tr><td>v2026.10.11.5 / 抽出ツール＋拡張の送信受信確認修正版</td><td>送信ボタン操作とGemini受信確認を分離。ジョブIDまたは指示全文の完全一致で照合。</td><td>PDF再抽出不要。送信結果が不明なら自動再送せず保持。空の新規会話を送信成功と扱わない。</td></tr>
         <tr><td>v2026.10.11.4 / 抽出ツール＋拡張の部分取込修正版</td><td>5記事中3枚などの部分生成でも、記事IDを照合できた画像を先に取り込む。不足分だけの指示コピーを追加。</td><td>PDF再抽出不要。画像の自動再生成はしない。説明がない画像は説明未取得として保持。拡張と抽出画面の両方を更新する必要あり。</td></tr>
@@ -1138,8 +1139,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.11.6';
-const APP_VERSION_NAME = '5記事ずつ自動続行・取込済み除外・完了後保存';
+const APP_VERSION = 'v2026.10.11.7';
+const APP_VERSION_NAME = '生成済み5枚の内容照合・自動取込';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)

@@ -78,7 +78,7 @@
             figureLog(`${job.articles.length}枚を一括取得・記事ID照合済み`,'ok');
             break;
           }
-          if(result.status==='explaining')status.textContent=`取込 ${done}/${figureRecords.length}件 ／ ${job.articles.length}記事の説明を取得中`;
+          if(result.status==='explaining')status.textContent=`取込 ${done}/${figureRecords.length}件 ／ 生成済み${job.articles.length}枚と記事をGeminiで照合中（再生成なし・操作不要）`;
           await sleep(4000);
         }
         if(!stop)await sleep(4000);
