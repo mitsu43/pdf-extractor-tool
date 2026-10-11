@@ -83,7 +83,14 @@ if(typeof chrome!=='undefined')chrome.runtime.onMessage.addListener((message,sen
       await chrome.storage.local.set({[key]:saved});
       if(result.status==='ready'){
         if(job.articles){
-          if(result.imageCount!=null&&result.imageCount!==job.articles.length)throw new Error(`${job.articles.length}記事に対して画像は${result.imageCount}枚でした。Geminiの生成済み画像は保持しています。1記事ずつへの変更・自動再生成はしません。`);
+          if(result.imageCount!=null&&result.imageCount<job.articles.length){
+            const results=await executeGemini(chrome,{target:{tabId:tab.id},world:'ISOLATED',func:collectGeminiImages,args:[result.url,0,{...job,allowImageOnly:true}]});
+            const pack=results.find(r=>r.frameId===0)?.result;
+            if(!pack?.items?.length)throw new Error('生成済み画像を記事IDで照合できません。順番だけでは登録しません。');
+            const missing=job.articles.filter(a=>!pack.articles.some(b=>b.gid===a.gid)).map(a=>a.gid);
+            reply({ok:true,status:'done',pack,url:result.url,missing,partial:true});return;
+          }
+          if(result.imageCount!=null&&result.imageCount>job.articles.length)throw new Error('対象記事より画像が多いため停止しました。記事IDと画像を確認してください。');
           let explanation=saved.explanation;
           if(!explanation){
             const textJob={...job,textOnly:true,prompt:`直前のバッチで実際に生成された各画像を確認し、画像を新しく生成せず説明だけをまとめて回答してください。各記事の見出しを ARTICLE_ID: 対象ID とし、その下に【起】【承】【転】【結】の各コマの主語・行動・何を意味するか、高校生向けの用語説明を記述してください。実画像にない出来事や人を加えず、見通し・疑いは断定しない。生成されなかった記事は「未生成」と記載し、画像を追加生成しない。\n${job.articles.map(a=>'ARTICLE_ID: '+a.gid+'\n正式記事タイトル：'+a.title).join('\n\n')}\nNIKKEI_EXPLANATION: ${job.id}`};

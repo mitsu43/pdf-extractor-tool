@@ -52,7 +52,11 @@ export async function collectGeminiImages(expectedUrl,offset=0,job=null){
         }).filter(content=>['起','承','転','結'].every(stage=>content.includes('【'+stage+'】')));
         if(sections.length===1)text=sections[0];
       }
-      if(!['起','承','転','結'].every(stage=>text.includes('【'+stage+'】'))){warnings.push(article.gid+'：起承転結の説明が不足しているため登録しません。');continue;}
+      if(!['起','承','転','結'].every(stage=>text.includes('【'+stage+'】'))){
+        if(!job.allowImageOnly){warnings.push(article.gid+'：起承転結の説明が不足しているため登録しません。');continue;}
+        warnings.push(article.gid+'：画像を記事IDで照合して取り込みました。起承転結の説明は未取得です。');
+        batchTargets.set(local[0],{...article,explanation:''});continue;
+      }
       batchTargets.set(local[0],{...article,explanation:text.slice(text.indexOf('【起】'),text.indexOf('【起】')+20000)});
     }
     if(!batchTargets.size)throw new Error('画像の直前にARTICLE_ID、直後に起承転結説明が必要です。対応不明・合成画像は自動登録しません。');
