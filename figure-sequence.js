@@ -2,6 +2,22 @@
   'use strict';
   let running=false,stop=false;
   const status=document.getElementById('figureSequenceStatus');
+  const copyMissing=document.getElementById('copyMissingFigurePromptBtn');
+  let missingRecords=[];
+  function partialStop(job,complete){
+    missingRecords=job.articles.filter(a=>!complete(a)).map(a=>figureRecords.find(r=>r.gid===a.gid)).filter(Boolean);
+    if(!missingRecords.length)return;
+    if(copyMissing){copyMissing.hidden=false;copyMissing.textContent=`不足${missingRecords.length}記事だけの指示をコピー`;}
+    throw new Error(`生成済み画像は取り込みました。不足${missingRecords.length}記事：${missingRecords.map(a=>a.gid).join(', ')}。不足分だけの指示をコピーできます。自動再生成はしません。`);
+  }
+  if(copyMissing)copyMissing.onclick=async()=>{
+    try{
+      if(!missingRecords.length)return;
+      const prompt=PdfFigurePrompt.makePrompt(missingRecords,document.getElementById('figureExtraThemeInput').value.trim());
+      await navigator.clipboard.writeText(prompt);
+      status.textContent=`不足${missingRecords.length}記事だけの指示をコピーしました。同じGemini会話で送信してください。取得済み画像は含めていません。`;
+    }catch(e){status.textContent='コピー失敗：'+e.message;}
+  };
   function db(){return new Promise((resolve,reject)=>{const r=indexedDB.open('nikkei-figure-sequence',1);r.onupgradeneeded=()=>r.result.createObjectStore('queues');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
   async function access(key,value){const d=await db();try{return await new Promise((resolve,reject)=>{const tx=d.transaction('queues',value===undefined?'readonly':'readwrite');const s=tx.objectStore('queues');const r=value===undefined?s.get(key):s.put(value,key);tx.oncomplete=()=>resolve(r.result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('保存が中断されました'));});}finally{d.close();}}
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -37,7 +53,7 @@
         const cached=queue.results[job.id]||await access(key+':'+job.id);
         if(cached){
           await apply(cached);lock();
-          if(!job.articles.every(complete))throw new Error('保存済みバッチに未取得記事があります。取得済み画像は保持しました。1記事ずつの再送はしません。');
+          partialStop(job,complete);
           continue;
         }
         if(job.articles.every(complete))continue;
@@ -57,7 +73,7 @@
             await apply(result.pack);
             lock();
             const missing=job.articles.filter(a=>!complete(a));
-            if(missing.length)throw new Error(`${missing.length}記事が未取得です。取得済み画像は保持しました。1記事ずつの送信・自動再送はしません。対象：${missing.map(a=>a.gid).join(', ')}`);
+            if(missing.length)partialStop(job,complete);
             figureLog(`${job.articles.length}枚を一括取得・記事ID照合済み`,'ok');
             break;
           }
