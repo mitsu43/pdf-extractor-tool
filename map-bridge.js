@@ -7,9 +7,10 @@
     if(event.source!==window||event.origin!==location.origin||event.data?.channel!==requestChannel)return;
     const {id,type,url,offset}=event.data;
     if(typeof id!=='string'||id.length>100)return;
-    const reply=data=>window.postMessage({channel:replyChannel,id,...data},location.origin);
-    if(type==='ping'){reply({ok:true,version:1,extensionVersion:chrome.runtime.getManifest().version});return;}
+    const reply=data=>window.postMessage({channel:replyChannel,id,...data,extensionId:chrome.runtime.id},location.origin);
+    if(type==='ping'){reply({ok:true,version:1,protocol:2,extensionVersion:chrome.runtime.getManifest().version,build:chrome.runtime.getManifest().version_name});return;}
     if(!['import','resolve','open','step'].includes(type))return;
+    if(event.data.extensionId&&event.data.extensionId!==chrome.runtime.id)return;
     if(busy){reply({ok:false,error:'取り込み中です。完了を待ってください。'});return;}
     busy=true;
     try{if(type==='import'&&(typeof url!=='string'||url.length>2000))throw new Error('会話URLを確認してください。');

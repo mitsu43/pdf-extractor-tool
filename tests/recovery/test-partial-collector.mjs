@@ -1,0 +1,33 @@
+import {fileURLToPath as handoffFileURLToPath} from 'node:url';
+const HANDOFF_SOURCE=handoffFileURLToPath(new URL('../../',import.meta.url));
+import assert from 'node:assert/strict';
+const {collectGeminiImages}=await import(`${HANDOFF_SOURCE}/collector.mjs`);
+globalThis.location={origin:'https://gemini.google.com',href:'https://gemini.google.com/app/test'};
+globalThis.Node={DOCUMENT_POSITION_FOLLOWING:4,DOCUMENT_POSITION_PRECEDING:2};
+const job={id:'partial-test',allowImageOnly:true,articles:Array.from({length:5},(_,i)=>({gid:`10/10_evening_${i+1}`,title:`記事${i+1}`,filename:`${i+1}.png`}))};
+const all=[],headers=[],photos=[];
+function node(text){const n={textContent:text,index:all.length,contains(o){return this===o;},compareDocumentPosition(o){return this.index<o.index?4:2;},closest(){return scope;}};all.push(n);return n;}
+for(const a of job.articles.slice(0,3)){headers.push(node('ARTICLE_ID: '+a.gid));photos.push(Object.assign(node(''),{alt:'（AI 生成）',complete:true,naturalWidth:1200,currentSrc:'data:image/png;base64,'+Buffer.from(a.gid).toString('base64')}));}
+const scope={querySelectorAll(s){return s==='img'?photos:s==='h1,h2,h3,h4,h5,h6,p,code'?headers:[];},querySelector(){return {textContent:all.map(n=>n.textContent).join('\n')};},contains(n){return all.includes(n);},lastChild:all.at(-1)};
+const turn={querySelector:s=>s==='user-query'?{textContent:'NIKKEI_JOB: '+job.id}:scope};
+globalThis.document={body:{lastChild:scope.lastChild},querySelectorAll(s){return s==='.conversation-container'?[turn]:s==='model-response'?[scope]:[];},createRange(){return {setStartAfter(){},setEndBefore(){},setEndAfter(){},toString(){return '';},cloneContents(){return {querySelectorAll:()=>[]};}};}};
+globalThis.FileReader=class{readAsDataURL(blob){blob.arrayBuffer().then(b=>{this.result='data:'+blob.type+';base64,'+Buffer.from(b).toString('base64');this.onload();});}};
+const pack=await collectGeminiImages(location.href,0,job);
+assert.equal(pack.items.length,3);assert.equal(pack.articles.length,3);
+assert.deepEqual(pack.articles.map(a=>a.gid),job.articles.slice(0,3).map(a=>a.gid));
+assert(pack.articles.every(a=>a.explanation===''));assert(pack.warnings.every(w=>w.includes('未取得')));
+await assert.rejects(collectGeminiImages(location.href,0,{...job,allowImageOnly:false}),/説明が必要/);
+headers[1].textContent=headers[0].textContent;
+await assert.rejects(collectGeminiImages(location.href,0,job),/重複/);
+console.log('PASS: real collector retains three ID-matched images without fabricated explanation; strict mode and duplicate-ID protection preserved.');
+headers.length=0;
+for(const a of job.articles.slice(3))photos.push(Object.assign(node(''),{alt:'（AI 生成）',complete:true,naturalWidth:1200,currentSrc:'data:image/png;base64,'+Buffer.from(a.gid).toString('base64')}));
+const makeMap=indices=>job.articles.map((a,i)=>`ARTICLE_ID: ${a.gid}\nIMAGE_INDEX: ${indices[i]}\n正式記事タイトル：${a.title}\n【起】subject\n【承】action\n【転】change\n【結】result`).join('\n\n');
+const mapped=await collectGeminiImages(location.href,0,{...job,explanation:makeMap([3,1,5,2,4])});
+assert.equal(mapped.items.length,5);
+assert.deepEqual(mapped.items.map(i=>i.filename),['2.png','4.png','1.png','5.png','3.png']);
+await assert.rejects(collectGeminiImages(location.href,0,{...job,explanation:makeMap([1,1,3,4,5])}),/対応確認/);
+await assert.rejects(collectGeminiImages(location.href,0,{...job,explanation:makeMap([1,2,3,4,5]).replace('正式記事タイトル：記事1','正式記事タイトル：wrong')}),/対応確認/);
+const failure=await collectGeminiImages(location.href,0,{...job,returnErrors:true,explanation:makeMap([1,1,3,4,5])});
+assert.match(failure.error,/対応確認/);
+console.log('PASS: five unlabeled gallery images use explicit content-verified mapping (not article order); duplicate indices, wrong titles and error details are protected.');

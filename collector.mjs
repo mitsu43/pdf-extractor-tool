@@ -1,10 +1,15 @@
 // Serialized by chrome.scripting; keep all dependencies inside this function.
 export async function collectGeminiImages(expectedUrl,offset=0,job=null){
+  try{
   const canonical=value=>{const u=new URL(value);return u.origin+u.pathname.replace(/\/$/,'');};
   if(location.origin!=='https://gemini.google.com'||canonical(location.href)!==canonical(expectedUrl))throw new Error('会話ページが切り替わりました。指定した会話で再試行してください。');
   let scope=document;
   if(job&&!job.importOnly){
-    const turns=[...document.querySelectorAll('.conversation-container')].filter(t=>t.querySelector('user-query')?.textContent.includes('NIKKEI_JOB: '+job.id));
+    const normalize=s=>s.replace(/\s+/g,' ').trim();
+    const turns=[...document.querySelectorAll('.conversation-container')].filter(t=>{
+      const text=t.querySelector('user-query')?.textContent||'';
+      return normalize(text).endsWith('NIKKEI_JOB: '+job.id)||(job.prompt&&normalize(text)===normalize(job.prompt));
+    });
     if(turns.length!==1)throw new Error('送信記事と画像を一意に対応できません。');
     scope=turns[0].querySelector('model-response');
     if(!scope)throw new Error('記事の応答がありません。');
@@ -19,6 +24,12 @@ export async function collectGeminiImages(expectedUrl,offset=0,job=null){
   const codes=[...document.querySelectorAll('code')].filter(n=>/^\d{3,}__.+\.(png|jpe?g|webp)$/i.test(n.textContent.trim()));
   const articleMap=new Map();
   const batchTargets=new Map();
+  function setTarget(img,article){
+    const previous=batchTargets.get(img);
+    if(previous&&previous.gid!==article.gid)throw new Error('画像の記事IDが見出し・alt・対応表で矛盾しています。順番では割り当てません。');
+    if([...batchTargets].some(([other,a])=>other!==img&&a.gid===article.gid))throw new Error('同じ記事の画像が複数あります：'+article.gid);
+    batchTargets.set(img,article);
+  }
   if(job?.articles){
     const nodes=[...scope.querySelectorAll('h1,h2,h3,h4,h5,h6,p,code')].filter(n=>!job.importOnly||images.some(img=>img.closest('model-response')===n.closest('model-response')));
     const markers=job.articles.map(a=>{
@@ -31,9 +42,29 @@ export async function collectGeminiImages(expectedUrl,offset=0,job=null){
       return {article:a,node:unique[0]};
     }).filter(m=>m.node);
     markers.sort((a,b)=>a.node.compareDocumentPosition(b.node)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1);
+    // Gemini may attach the article identity to the image alt text rather than a heading.
+    for(const img of images){
+      const ids=[...(img.alt||'').matchAll(/ARTICLE_ID\s*[:：]\s*(\d{1,2}\/\d{1,2}_(?:morning|evening|regional|plusone|weekly|saturday)_\d+)/g)];
+      if(ids.length!==1)continue;
+      const article=job.articles.find(a=>a.gid===ids[0][1]);
+      if(!article)continue;
+      const twins=images.filter(other=>[...(other.alt||'').matchAll(/ARTICLE_ID\s*[:：]\s*(\d{1,2}\/\d{1,2}_(?:morning|evening|regional|plusone|weekly|saturday)_\d+)/g)].some(id=>id[1]===article.gid));
+      if(twins.length>1)throw new Error('同じ記事の画像が複数あります：'+article.gid);
+      const responses=job.explanation?[job.explanation]:[...document.querySelectorAll('model-response')].map(n=>n.querySelector('message-content')?.textContent||n.textContent||'');
+      let explanation='';
+      for(const content of responses){
+        const labels=[...content.matchAll(/ARTICLE_ID\s*[:：]\s*(\d{1,2}\/\d{1,2}_(?:morning|evening|regional|plusone|weekly|saturday)_\d+)/g)];
+        for(const [i,label] of labels.entries()){
+          if(label[1]!==article.gid)continue;
+          const section=content.slice(label.index,labels[i+1]?.index??content.length);
+          if(['起','承','転','結'].every(s=>section.includes('【'+s+'】')))explanation=section.slice(section.indexOf('【起】'),section.indexOf('【起】')+20000);
+        }
+      }
+      if(explanation||job.allowImageOnly)setTarget(img,{...article,explanation});
+    }
     for(let m=0;m<markers.length;m++){
       const {article,node}=markers[m],next=markers[m+1]?.node;
-      const local=images.filter(img=>(node.compareDocumentPosition(img)&Node.DOCUMENT_POSITION_FOLLOWING)&&(!next||(img.compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING)));
+      const local=images.filter(img=>img.closest('model-response')===node.closest('model-response')&&(node.compareDocumentPosition(img)&Node.DOCUMENT_POSITION_FOLLOWING)&&(!next||(img.compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING)));
       if(local.length!==1){warnings.push(article.gid+'：独立した画像1枚と対応できないため登録しません。');continue;}
       const range=document.createRange();range.setStartAfter(node);
       const response=node.closest('model-response')||scope;
@@ -55,9 +86,26 @@ export async function collectGeminiImages(expectedUrl,offset=0,job=null){
       if(!['起','承','転','結'].every(stage=>text.includes('【'+stage+'】'))){
         if(!job.allowImageOnly){warnings.push(article.gid+'：起承転結の説明が不足しているため登録しません。');continue;}
         warnings.push(article.gid+'：画像を記事IDで照合して取り込みました。起承転結の説明は未取得です。');
-        batchTargets.set(local[0],{...article,explanation:''});continue;
+        setTarget(local[0],{...article,explanation:''});continue;
       }
-      batchTargets.set(local[0],{...article,explanation:text.slice(text.indexOf('【起】'),text.indexOf('【起】')+20000)});
+      setTarget(local[0],{...article,explanation:text.slice(text.indexOf('【起】'),text.indexOf('【起】')+20000)});
+    }
+    if(!markers.length&&!batchTargets.size&&!job.importOnly&&job.explanation){
+      const ids=[...job.explanation.matchAll(/ARTICLE_ID\s*[:：]\s*(\d{1,2}\/\d{1,2}_(?:morning|evening|regional|plusone|weekly|saturday)_\d+)/g)];
+      const mapped=[],used=new Set();
+      for(const [i,id] of ids.entries()){
+        const article=job.articles.find(a=>a.gid===id[1]);
+        const section=job.explanation.slice(id.index,ids[i+1]?.index??job.explanation.length);
+        const indices=[...section.matchAll(/IMAGE_INDEX\s*[:：]\s*(\d+)\b/g)];
+        const title=section.match(/正式記事タイトル\s*[:：]\s*([^\n]+)/)?.[1]?.trim();
+        const imageIndex=Number(indices[0]?.[1])-1;
+        if(!article||ids.filter(m=>m[1]===id[1]).length!==1||indices.length!==1||title!==article.title||imageIndex<0||imageIndex>=images.length||used.has(imageIndex)||!['起','承','転','結'].every(s=>section.includes('【'+s+'】'))){
+          throw new Error('画像と記事の対応確認が不完全です。画像は再生成せず保持しています。');
+        }
+        used.add(imageIndex);mapped.push([images[imageIndex],{...article,explanation:section.slice(section.indexOf('【起】'),section.indexOf('【起】')+20000)}]);
+      }
+      if(images.length!==job.articles.length||mapped.length!==images.length)throw new Error(`画像${images.length}枚に対し対応確認が${mapped.length}件です。画像は再生成していません。`);
+      for(const [img,article] of mapped)setTarget(img,article);
     }
     if(!batchTargets.size)throw new Error('画像の直前にARTICLE_ID、直後に起承転結説明が必要です。対応不明・合成画像は自動登録しません。');
   }
@@ -71,7 +119,7 @@ export async function collectGeminiImages(expectedUrl,offset=0,job=null){
       }
     }catch{}
   }
-  const items=[],usedNames=new Set();let total=0,nextOffset=null;
+  const items=[],capturedGids=new Set(),usedNames=new Set();let total=0,nextOffset=null;
   for(const [i,img] of images.entries()){
     if(i<offset)continue;
     if(job?.articles&&!batchTargets.has(img))continue;
@@ -127,7 +175,7 @@ export async function collectGeminiImages(expectedUrl,offset=0,job=null){
       if(job?.articles){
         const target=batchTargets.get(img);
         filename=target.filename;explanation=target.explanation;
-        articleMap.set(target.gid,{gid:target.gid,title:target.title,explanation});
+        articleMap.set(target.gid,{gid:target.gid,title:target.title,explanation});capturedGids.add(target.gid);
       }else if(job){
         filename=job.filename;
         const content=responseRoot?.querySelector('message-content')?.textContent||'';
@@ -140,5 +188,9 @@ export async function collectGeminiImages(expectedUrl,offset=0,job=null){
   }
   if(canonical(location.href)!==canonical(expectedUrl))throw new Error('取得中に会話が切り替わりました。再試行してください。');
   if(!items.length)throw new Error(warnings.join('\n')||'画像を取得できませんでした。');
-  return {version:1,items,articles:[...articleMap.values()],warnings,nextOffset};
+  return {version:1,items,articles:[...articleMap.values()].filter(a=>!job?.articles||capturedGids.has(a.gid)),warnings,nextOffset};
+  }catch(error){
+    if(job?.returnErrors)return {version:0,error:error.message||'生成画像の取得に失敗しました。'};
+    throw error;
+  }
 }
