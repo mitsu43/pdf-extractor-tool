@@ -67,6 +67,7 @@
           status.textContent=`取込 ${done}/${figureRecords.length}記事 ／ ${job.articles.length}記事を1回で生成中（独立${job.articles.length}枚）`;
           if(Date.now()-began>1800000)throw new Error('30分以内にバッチ完了を確認できませんでした。取得済み画像は保持しています。同じボタンで再開できます。自動再送信はしません。');
           const result=await FigureGeminiBridge.step(job);
+          if(result.status==='send-attempted')status.textContent=`${job.articles.length}記事の送信を操作しました。Geminiの受信確認待ちです（生成成功は未確認）。`;
           if(result.url)document.getElementById('figureConversationInput').value=result.url;
           if(result.status==='done'){
             await access(key+':'+job.id,result.pack);
