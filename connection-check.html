@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>画像取込拡張の接続確認</title>
+<style>body{font:18px/1.7 system-ui,sans-serif;max-width:850px;margin:40px auto;padding:0 20px;background:#faf8f2;color:#242424}pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:20px;background:white;border:1px solid #ddd}button{font:inherit;padding:8px 18px}h1{font-size:25px}</style>
+<h1>画像取込拡張の接続確認</h1>
+<p>拡張がこのページで応答するか確認します。記事・画像・進捗は変更せず、Geminiへの送信も行いません。</p>
+<pre id="result" role="status">確認中…</pre><button id="retry" disabled>もう一度確認</button>
+<script>
+const out=document.getElementById('result'),button=document.getElementById('retry');
+function check(){
+ button.disabled=true;const id=crypto.randomUUID(),replies=[];let selfMessage=false;
+ const lines=()=>['接続診断 v1','URL：'+location.href,'このページ内の通信：'+(selfMessage?'正常':'未確認'),'拡張の応答：'+replies.length+'件',...replies.map(x=>'版：'+(x.extensionVersion||'不明')+' / ID：'+(x.extensionId||'不明')+' / プロトコル：'+(x.protocol||'不明'))];
+ const receive=e=>{
+  if(e.origin!==location.origin||e.source!==window||e.data?.id!==id)return;
+  if(e.data.channel==='nikkei-gemini-request-v1')selfMessage=true;
+  if(e.data.channel==='nikkei-gemini-reply-v1')replies.push(e.data);
+  out.textContent=lines().join('\n')+'\n確認中…';
+ };
+ window.addEventListener('message',receive);
+ out.textContent='確認中…（4秒）';
+ window.postMessage({channel:'nikkei-gemini-request-v1',id,type:'ping'},location.origin);
+ setTimeout(()=>{
+  window.removeEventListener('message',receive);button.disabled=false;
+  let message=replies.length===1?'接続成功。この新しいページでは拡張が応答しています。':replies.length>1?'複数の拡張が応答しています。':'拡張から応答がありません。この新しいページでも接続できていません。';
+  out.textContent=lines().join('\n')+'\n結果：'+message+'\nこの枠内の結果をそのまま担当者へ送ってください。';
+ },4000);
+}
+button.addEventListener('click',check);check();
+</script></html>
