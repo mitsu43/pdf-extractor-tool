@@ -632,8 +632,27 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <span class="version-status" id="versionStatus">この画面の読込版（本番の最新版かは未確認）</span>
     <button type="button" class="update-tool-btn" id="updateToolBtn">画面を再読み込み</button>
   </div>
+  <section aria-labelledby="releaseHistoryHeading" style="margin-top:16px;line-height:1.6;font-size:14px">
+    <h2 id="releaseHistoryHeading" style="font-size:18px">バージョン・更新日時・確認状況</h2>
+    <p><strong>今回変更したのは、この更新履歴の表示です。生成済み5枚の取り込み・次の5記事への自動移行は、実データでの確認が終わっていません。</strong></p>
+    <p>日時は日本時間。過去の日時はGitHubのコミット記録です。拡張の端末への適用日時とは異なります。<a href="https://github.com/mitsu43/pdf-extractor-tool#バージョン更新履歴日本時間" target="_blank" rel="noopener">GitHubの更新履歴・変更の証拠</a></p>
+    <div style="overflow-x:auto">
+    <table id="releaseHistoryTable" style="width:100%;border-collapse:collapse;text-align:left;min-width:640px">
+      <thead><tr><th scope="col">対象・版</th><th scope="col">更新日時（日本時間）</th><th scope="col">更新内容</th><th scope="col">確認状況</th></tr></thead>
+      <tbody>
+        <tr><td>この画面 v2026.10.12.4</td><td>2026-10-12 16:09 作成<br><a href="https://github.com/mitsu43/pdf-extractor-tool/commits/main/index.html">反映日時の記録</a></td><td>更新表を画面上部に常時表示</td><td>表示のみ変更。抽出・保存・生成処理は変更なし</td></tr>
+        <tr><td>GitHubのREADME</td><td>2026-10-12 16:04:53</td><td>バージョン・更新日時・検証状況の表を追加</td><td>READMEのみ。ツール画面はこの時点で未変更</td></tr>
+        <tr><td>不要ファイル整理</td><td>2026-10-12 16:00:22</td><td>未使用45ファイルを削除</td><td>GitHub反映済み。機能修復ではありません</td></tr>
+        <tr><td>修復候補 v2026.10.12.3-rc1</td><td>2026-10-12 15:54:34</td><td>部分取得時の説明保全・接続確認先行</td><td>source内のみ。この画面の処理には未反映。実データ未検証</td></tr>
+        <tr><td>診断画面 v2026.10.12.2</td><td>2026-10-12 15:28:48</td><td>診断結果のダウンロード</td><td>本番画面で51記事・拡張1.4.2の応答を確認</td></tr>
+        <tr><td>抽出処理 v2026.10.11.9<br>配布拡張 1.4.4</td><td>2026-10-12 06:48:33</td><td>画像・説明の保存復元と再送抑止</td><td>コード試験済み。Geminiを含む実動作は未確認。端末の拡張更新も未確認</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>この表示更新のために、PDFの再抽出・画像の再生成・保存データの削除を行う必要はありません。</p>
+  </section>
   <details style="margin-top:10px;line-height:1.8;font-size:13px">
-    <summary>変更履歴・再抽出が必要か・再開手順</summary>
+    <summary>過去の変更記録・再開手順（実動作の保証ではありません）</summary>
     <p><strong>今回の更新だけならPDFの再抽出は不要です。</strong>抽出済みJSONと画像はそのまま使えます。記事の欠落・誤抽出がある場合だけ、その範囲を確認・追加してください。</p>
     <table style="width:100%;border-collapse:collapse;text-align:left">
       <thead><tr><th>版 / 対象</th><th>変更内容</th><th>既存データ・再開</th></tr></thead>
@@ -1141,8 +1160,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.11.9';
-const APP_VERSION_NAME = '画像・説明の復元／拡張識別（実画面検証待ち）';
+const APP_VERSION = 'v2026.10.12.4';
+const APP_VERSION_NAME = '更新履歴の画面表示のみ変更／画像取込の実動検証は未完了';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
