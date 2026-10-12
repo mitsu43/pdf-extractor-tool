@@ -1,14 +1,1 @@
-{
-  "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=22"
-  },
-  "devDependencies": {
-    "pdf-lib": "1.17.1",
-    "fake-indexeddb": "6.2.4"
-  },
-  "scripts": {
-    "test:recovery": "node tests/recovery/test-auto-continue.mjs && node tests/recovery/test-bridge-handshake.mjs && node tests/recovery/test-bulk-background.mjs && node tests/recovery/test-partial-collector.mjs && node tests/recovery/test-publication-five-pages.mjs && node tests/recovery/test-recovery-storage.mjs"
-  }
-}
+{"private":true,"type":"module","scripts":{"test":"node test-readonly.mjs"},"devDependencies":{"fake-indexeddb":"6.2.4"}}

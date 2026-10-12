@@ -1,0 +1,28 @@
+診断ボタン v2026.10.12.2
+
+追加・更新する本番ファイルは次の3つだけです。
+connection-check.html
+storage-diagnostic.js
+diagnostic-download.js
+
+GitHub Pagesのpdf-extractor-toolの同じフォルダに3ファイルを配置してください。
+index.html・抽出処理・画像生成・拡張・保存データは変更しません。
+本番URL: https://mitsu43.github.io/pdf-extractor-tool/connection-check.html
+公開後は「診断結果をダウンロード」を1回押すだけです。コンソールは不要です。
+
+DBは存在を確認してからreadonlyで読み取り、作成・更新・削除はしません。
+DB列挙後に消えた場合のupgradeはabortします。
+本文、画像本体、説明本文、プロンプト、会話URL、APIキーは出力しません。
+拡張への通信はpingのみ。Geminiへの生成要求や外部サーバーへの送信はありません。
+JSONは端末へのダウンロードだけで、表示された再ダウンロードリンクも同じ結果です。
+旧タブの未保存データ・過去の送信結果はUNKNOWNのまま扱います。
+この診断はバックアップや復旧操作ではありません。
+
+検証:
+Node/fake-indexeddbによる7ケース通過。script読込だけではDBを開かないことも検証。
+既存データ、空DB、列挙後の消失、列挙失敗、origin違い、store欠落、読取エラー。
+ChromeのローカルテストでボタンからJSONダウンロードを確認。
+本番の保存データは未診断。本番は未公開。
+ローカルのDBなしは本番データの消失を意味しません。
+
+開発者向け再試験: pnpm install --ignore-scripts / node test-readonly.mjs
