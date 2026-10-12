@@ -1,0 +1,9 @@
+{
+  "READ-FIRST.txt": "3a48bcee0d2f9de5a67e6aa5c62bfde7020c62d371df850aaa8d31add2f197f5",
+  "TEST-RESULTS.txt": "f737adda85681947660f7d3b70d38b9227e6897d3ccc57eeb8283eb7c9384fcc",
+  "diagnose-persistent-only.js": "096f3ac2857450604d3ee9d9528cc70065df72e7e8431962246aae12206a7bf6",
+  "package.json": "9c6faf7f102aab241386a43ce6c7c269564cf8947b4b4027201447dd7a6e64a1",
+  "reference-connection-check.html.txt": "5734a6a669427d4ab7c373caa081e22b9ef03275be743a0eca4617d2400317b1",
+  "source-check.json": "5b4d10de65e5955a8a5b064d0a01b06b6f3d3c667d7cead99a26181dfaedb738",
+  "test-readonly.mjs": "13281186fc79dcde216bde05cdea1f4eee79ad502413ff46b496772f363cec31"
+}

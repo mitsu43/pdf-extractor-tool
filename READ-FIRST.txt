@@ -1,28 +1,57 @@
-診断ボタン v2026.10.12.2
+Mac側Codex・Claude向け：元タブ不在時の永続データ診断
+2026-10-12 / 本番未変更 / ジョブ変更なし
 
-追加・更新する本番ファイルは次の3つだけです。
-connection-check.html
-storage-diagnostic.js
-diagnostic-download.js
+【事実】
+Macの停止中タブは見つからず、元タブが閉じたかも不明。実機診断JSONは未取得。各値は未確認であり、0やfalseではありません。
+公開中のindex.html、figure-gemini-bridge.js、figure-sequence.jsをHTTP取得し、今回調べたdeploy-releaseのソースとバイト一致を確認しました。ハッシュはsource-check.jsonに収録しています。公開ページは引き続きv2026.10.11.9です。
+検討中のdispatch-journalパッチは、ping成功後・step要求前にcheckingを保存する変更です。ローカル適用で既存・追加テストを通過済みですが、今回公開しません。保存済みcheckingの解除処理も含みません。
 
-GitHub Pagesのpdf-extractor-toolの同じフォルダに3ファイルを配置してください。
-index.html・抽出処理・画像生成・拡張・保存データは変更しません。
-本番URL: https://mitsu43.github.io/pdf-extractor-tool/connection-check.html
-公開後は「診断結果をダウンロード」を1回押すだけです。コンソールは不要です。
+【起動処理の確認結果】
+index.htmlのinit()はloadSession()を自動実行します。
+loadSession() → openDB() → indexedDB.open('pdfExtractorDB',1)。
+DBがない場合はonupgradeneededでsessionsストアを作成します。既存DBのsessions読取自体はreadonlyですが、新規本画面の起動を「DBを作成しない診断」として案内できません。
+スキーマ設定のsaveSchema()はボタン操作へ登録され、起動時のapplyPreset()はメモリ・UIを更新します。今回特定した自動起動上の問題は上記のDB作成経路です。すべてのブラウザ内部キャッシュ等が無変更だと保証するものではありません。
 
-DBは存在を確認してからreadonlyで読み取り、作成・更新・削除はしません。
-DB列挙後に消えた場合のupgradeはabortします。
-本文、画像本体、説明本文、プロンプト、会話URL、APIキーは出力しません。
-拡張への通信はpingのみ。Geminiへの生成要求や外部サーバーへの送信はありません。
-JSONは端末へのダウンロードだけで、表示された再ダウンロードリンクも同じ結果です。
-旧タブの未保存データ・過去の送信結果はUNKNOWNのまま扱います。
-この診断はバックアップや復旧操作ではありません。
+【安全な実行場所】
+元タブが見つかった場合：移動・再読込せず、そのタブのコンソールでdiagnose-persistent-only.jsを実行できます。このスクリプトはアプリの関数を呼ばず、元タブのメモリも読みません。診断中に元アプリが独自に保存する可能性はあるため、他の開始・保存操作を同時に行わないでください。
+元タブが見つからない場合：抽出に使ったChromeプロファイルで、次の接続診断ページだけを新しいトップレベルタブとして開き、そのページのコンソールで同じスクリプトを実行してください。
+https://mitsu43.github.io/pdf-extractor-tool/connection-check.html
+本画面index.htmlは開きません。file://や別originのローカルHTML、別プロファイル、シークレットウインドウでは対象DBを調べられません。
+接続診断ページはHTTP再取得し、確認済みソースと一致しました。外部アプリスクリプトの読込、IndexedDB、localStorageへのアクセスはありません。自動pingが一度ありますが、拡張map-bridge.jsはpingを直接返信し、背景処理やGeminiへの送信へ進みません。ソース写しをreference-connection-check.html.txtに添付します。これは参照用であり、ローカルから開くためのページではありません。
+確認時の接続診断ページSHA-256：5734a6a669427d4ab7c373caa081e22b9ef03275be743a0eca4617d2400317b1
+新しい診断ページでのping結果は、過去の停止原因や旧タブの状態を証明しません。
 
-検証:
-Node/fake-indexeddbによる7ケース通過。script読込だけではDBを開かないことも検証。
-既存データ、空DB、列挙後の消失、列挙失敗、origin違い、store欠落、読取エラー。
-ChromeのローカルテストでボタンからJSONダウンロードを確認。
-本番の保存データは未診断。本番は未公開。
-ローカルのDBなしは本番データの消失を意味しません。
+【次の操作は１つ】
+Mac側Codexに、上記の条件でdiagnose-persistent-only.jsを１回実行し、出力JSONを取得してもらってください。再読み込み、復元ボタン、ジョブ解除、開始・再開は行いません。スクリプトがエラーや未対応を返す場合は、その結果で止めてください。DBを推測して開く代替コードは実行しないでください。
+元タブの探索を再び繰り返す必要はありません。元タブが現在見つかっていなければ後者の経路で進められます。元のプロファイルが特定できない場合、出力は「このプロファイルの結果」としてのみ扱ってください。
 
-開発者向け再試験: pnpm install --ignore-scripts / node test-readonly.mjs
+【スクリプトの保証範囲】
+対象はpdfExtractorDB/sessions、nikkei-figure-sequence/queues、nikkei-figure-artifacts-v1/currentとhistoryだけです。
+indexedDB.databases()で存在を列挙し、存在する対象DBだけをバージョン指定なしで開きます。列挙できない場合は停止します。
+DB列挙とopenの間に別処理がDBを消す競合は原子的に防げません。万一onupgradeneededが発火した場合は直ちにabortし、DB・ストア作成を永続化しません。この競合時にはブラウザ内部のversionchangeトランザクションが開始し得ますが、診断からスキーマ変更命令を実行しません。模擬試験で終了後もDBなしを確認しました。
+全データ読取トランザクションはreadonly。put/add/delete/clear、createObjectStore/deleteObjectStore、deleteDatabaseを呼びません。localStorage、拡張ストレージへアクセスせず、通信・クリップボード書込・ファイル書出も行いません。
+current等はカーソルの各値を同期的に要約し、historyは件数だけを取得します。画像バイト列、記事本文、タイトル、プロンプト、会話URL、トークンは出力しません。Blobの件数・サイズと説明見出しの有無だけを調べます。
+最大2000レコード、各キュー最大500ジョブを出力し、上限を超えた場合はtruncatedを付けます。失敗や欠落はエラー状態として出し、件数0に置換しません。各ストアのトランザクション完了を待ち、接続を閉じます。
+ブラウザ内部のディスク管理・履歴・キャッシュ更新までゼロとする保証ではなく、診断によるアプリDBの書込・スキーマ変更ゼロを対象とします。
+
+【永続データから分かること】
+そのorigin・プロファイルに存在する対象DBと版、保存記事件数と保存時刻、キューのジョブID・phase・記事数・復旧指定、日付と版のscope、保存画像の件数・サイズ・説明マーカー有無、過去スナップショット件数。
+scopeがnullの場合は解釈できなかったことを示し、データがない意味ではありません。phaseがUNKNOWNの場合も勝手にpreparedとみなしません。cached-result-or-pageの件数は、復元が成功する証明ではありません。
+各ストアでの読取時点は一致しません。他タブの同時書込がある場合、全DB一括の整合したスナップショットとは限りません。
+
+【分からないこと】
+旧タブの未保存記事・画像・説明・対応表、当時の選択日付・版、当時のping結果、過去の拡張ID、Geminiでの送信成否と生成済み画像の有無。
+originalTabMemory=NOT_INSPECTED、sendOutcome=UNKNOWNを必ず出します。画像件数が保存されていても、旧タブの最新内容と一致する保証はありません。この診断はバックアップではありません。
+DBなしは「この実行コンテキストで見えない」であり、データ消失や未送信の証明ではありません。checkingは解除しません。拡張記録なしや会話検索で見つからないことだけで、未送信を確定しないでください。
+
+【検証済み成果物】
+diagnose-persistent-only.js：Macで実行する最小診断。
+test-readonly.mjs・package.json：模擬試験。Node24.19.0、fake-indexeddb6.2.4。
+TEST-RESULTS.txt：今回の実行ログ。
+source-check.json：公開ファイル照合結果。
+reference-connection-check.html.txt：診断用ページの確認済みソース。
+inventory-sha256.json：同梱ファイルのハッシュ。
+再試験は独立した作業ディレクトリでnpm installの後npm test。Mac利用者のブラウザDBには接続しません。依存ライブラリそのものはZIPに含めません。
+
+７試験：既存DBの要約と秘密情報非出力／空プロファイルでopenゼロ／列挙後の消失時に作成を中止／列挙失敗時に停止／異なるoriginで停止／ストア欠落時に作成なし／読取失敗をエラーとして報告。
+書込・スキーマ変更APIを監視し、呼出ゼロを確認。全データ読取がreadonlyであることを確認。実際のChrome、Mac、GeminiのE2Eは未実施です。

@@ -1,0 +1,17 @@
+[
+  {
+    "file": "index.html",
+    "matches_reviewed_source": true,
+    "sha256": "868268dd51d3df3b63f059f84cf9ad7f88a2a9fe90ef78f33b92c0fc7cf9c15c"
+  },
+  {
+    "file": "figure-gemini-bridge.js",
+    "matches_reviewed_source": true,
+    "sha256": "19c5239d248c8f9bb81cc613619e2ac56900749e93e7efa3515e2be30a1085f7"
+  },
+  {
+    "file": "figure-sequence.js",
+    "matches_reviewed_source": true,
+    "sha256": "427603ffa2da2ec0408a374143dc5e16bc9ddeef5cb4d192fba914c3dc573797"
+  }
+]

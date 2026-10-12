@@ -1,0 +1,9 @@
+Node v24.19.0 / fake-indexeddb 6.2.4
+PASS existing DB summaries; zero writes/schema changes; no secret/body/image/URL output
+PASS empty profile: no open calls; no DB created
+PASS enumeration/open deletion race: upgrade aborted; no durable DB/schema created
+PASS enumeration unsupported or denied: no fallback opens
+PASS wrong origin: no DB access
+PASS missing store: no creation
+PASS read failure: reports unknown/error, never zero or false success
+7 scenarios passed. Node/fake-indexeddb only; no Mac/browser E2E.

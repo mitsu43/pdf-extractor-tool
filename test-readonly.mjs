@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {IDBFactory,IDBDatabase,IDBObjectStore,IDBCursor} from 'fake-indexeddb';
-const source=fs.readFileSync(new URL('./storage-diagnostic.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL('./diagnose-persistent-only.js',import.meta.url),'utf8');
 const seed=(f,name,stores)=>new Promise((resolve,reject)=>{
  const r=f.open(name,1);r.onupgradeneeded=()=>Object.keys(stores).forEach(s=>r.result.createObjectStore(s));
  r.onerror=()=>reject(r.error);r.onsuccess=()=>{const db=r.result,t=db.transaction(Object.keys(stores),'readwrite');
@@ -21,7 +21,7 @@ async function run(f,{origin='https://mitsu43.github.io',enumerate,failTransacti
  const no=()=>{forbidden.push('external-or-storage');throw new Error('FORBIDDEN');};
  const c=vm.createContext({indexedDB:api,location:{origin,pathname:'/pdf-extractor-tool/connection-check.html'},Blob,Date,JSON,setTimeout,clearTimeout,
  console:{log:x=>logs.push(x)},fetch:no,postMessage:no,localStorage:{getItem:no,setItem:no,removeItem:no},navigator:{clipboard:{writeText:no}}});
- try{vm.runInContext(source,c);assert.equal(opened.length,0,'loading does not open DBs');const out=await c.NikkeiStorageDiagnostic.collect();assert.equal(forbidden.length,0);assert(!/SECRET|https:\/\/gemini|data:image/.test(JSON.stringify(out)));return {out,opened,modes};}
+ try{const out=await vm.runInContext(source,c);assert.equal(forbidden.length,0);assert(!/SECRET|https:\/\/gemini|data:image/.test(logs.join('')));return {out,opened,modes};}
  finally{undo.reverse().forEach(fn=>fn());}
 }
 let tests=0;
