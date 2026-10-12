@@ -2,6 +2,28 @@
 
 公開サイト: https://mitsu43.github.io/pdf-extractor-tool/
 
+## バージョン・更新履歴（日本時間）
+
+日時はGitHubに記録されたコミット日時です。サイトへの配信完了時刻や、手元のChrome拡張の更新時刻ではありません。日付だけで「動作確認済み」とは判断しないでください。
+
+| 対象 | バージョン | 更新日時（日本時間） | 更新内容サマリ | 反映・検証状況 | 変更の証拠 |
+| --- | --- | --- | --- | --- | --- |
+| リポジトリ整理 | アプリ版変更なし | 2026-10-12 16:00:22 | 未使用ファイル45件削除、README整理 | GitHub main反映済み。参照・PDF分割・拡張処理のコード試験通過。機能修復ではない | [22c9de0](https://github.com/mitsu43/pdf-extractor-tool/commit/22c9de00f9582e33744748c7f0855d22058b5f75) |
+| 修復候補（source内） | v2026.10.12.3-rc1 | 2026-10-12 15:54:34 | 部分取得時の説明保全、空画像除外、接続確認先行 | sourceへ登録済み。本番用ルートには未反映。模擬試験・Chrome試験データで検証。実際の生成済み5枚は未確認 | [be972f2](https://github.com/mitsu43/pdf-extractor-tool/commit/be972f2a9858f05cc986dd10e6ea4f152ef46311) / [検証記録](REPAIR-RESULT.txt) |
+| 診断画面 | v2026.10.12.2 | 2026-10-12 15:28:48 | コンソール不要の診断結果ダウンロード | GitHub反映済み。本番URLで読み取り専用診断を実行し、51記事と拡張1.4.2の応答を確認 | [c332d98](https://github.com/mitsu43/pdf-extractor-tool/commit/c332d98641553b228694d4e5124c38f5aad736b0) / [診断画面](https://mitsu43.github.io/pdf-extractor-tool/connection-check.html) |
+| 抽出ツール（公開用ルート） | v2026.10.11.9 | 2026-10-12 06:48:33 | 画像・説明の保存復元、旧ジョブの再送抑止、拡張識別 | GitHub公開用コードに反映済み。実際の生成済み5枚の取り込み・次の5件の実生成は未確認 | [a7c97a3](https://github.com/mitsu43/pdf-extractor-tool/commit/a7c97a351f1dd6043c1c3b9510d526ce598d2c23) |
+| 画像取込拡張（配布版） | 1.4.4 | 2026-10-12 06:48:33 | 復旧時の再送抑止、拡張識別 | GitHub配布済み。利用者Chromeへの適用は未確認。2026-10-12 15:43の実測応答は1.4.2 | [a7c97a3](https://github.com/mitsu43/pdf-extractor-tool/commit/a7c97a351f1dd6043c1c3b9510d526ce598d2c23) / [拡張ZIP](downloads/gemini-map-import-extension-1.4.4.zip) |
+
+**現在の未完了事項：実際のGemini生成済み5枚の取り込みと、その後の未処理5記事への自動移行。修復完了とは報告していません。**
+
+### 更新時の記録ルール
+
+- 更新のたびにこの表へ行を追加し、過去の記録を残します。
+- 抽出ツール・拡張・診断画面・修復候補を別々に記載します。
+- 「コード試験」「試験データのブラウザ確認」「実際のGeminiを含む一連の動作確認」を区別します。
+- GitHubへの反映、サイトへの配信、端末への適用を混同しません。
+- 変更コミットと検証記録をリンクします。README自体の更新日時は[READMEの履歴](https://github.com/mitsu43/pdf-extractor-tool/commits/main/README.md)で確認できます。
+
 ## ファイルの区分
 
 | 場所 | 用途 |
