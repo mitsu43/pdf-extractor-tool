@@ -1,0 +1,131 @@
+{
+  "createdAt": "2026-10-11T02:03:03.603Z",
+  "purpose": "Unverified recovery source snapshot; not a release",
+  "files": [
+    {
+      "file": "source/pdf-extractor-tool/CHANGELOG.md",
+      "sha256": "557d4922ef5c2c7a89012b38b1e20b4ea24043462fbc8fd144f61e34d3c8e6fd",
+      "bytes": 6518
+    },
+    {
+      "file": "source/pdf-extractor-tool/README.md",
+      "sha256": "04deb87d24997858c1e38f4fd1942ca9fafae42c2dbb0f93fcd2cc7e41d150bc",
+      "bytes": 2578
+    },
+    {
+      "file": "source/pdf-extractor-tool/figure-gemini-bridge.js",
+      "sha256": "da3b91995afee11280df5a95ba7745afcd6a109e929607ac8c10317c938f1e7e",
+      "bytes": 2665
+    },
+    {
+      "file": "source/pdf-extractor-tool/figure-job-prompt.js",
+      "sha256": "073e7b6baaba399e662c677a44cb6c9bc4fc54e891cf12d7343ad189a44731a4",
+      "bytes": 8052
+    },
+    {
+      "file": "source/pdf-extractor-tool/figure-prompt.js",
+      "sha256": "5cfd50a3d854e9cefa9f29cc3388b2be2f8a9ca7a48c5bbea27d58795fcb9c0a",
+      "bytes": 19641
+    },
+    {
+      "file": "source/pdf-extractor-tool/figure-sequence.js",
+      "sha256": "64eec78887687e66fd29603a21cf4140f08e7323a39265f0a6c696c7c3bcb54a",
+      "bytes": 7188
+    },
+    {
+      "file": "source/pdf-extractor-tool/figure-url-import.js",
+      "sha256": "0bc4242831a247084df6cf58659bbb7c9f2addd3733d2b41e9e56fe2754fe91a",
+      "bytes": 7013
+    },
+    {
+      "file": "source/pdf-extractor-tool/figure-zip.js",
+      "sha256": "8c765a4c09f45108d94c88dd6e01e8508832951be2cdeafe0bbc1af27f1624f3",
+      "bytes": 4282
+    },
+    {
+      "file": "source/pdf-extractor-tool/index.html",
+      "sha256": "f9fbf17c69b2f4a41055792ecbfe20d0716f3915f876b1d1cf0f0a694f26dbc6",
+      "bytes": 286802
+    },
+    {
+      "file": "source/pdf-extractor-tool/jszip.min.js",
+      "sha256": "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e",
+      "bytes": 97630
+    },
+    {
+      "file": "source/pdf-extractor-tool/pdf-figure-prompt.js",
+      "sha256": "6b1b2d658a863aa823864e896da166ac3645748f358a0f59618365e25eedae53",
+      "bytes": 4075
+    },
+    {
+      "file": "source/gemini-map-import-extension/README.txt",
+      "sha256": "dadc1bd725b311c92bc37aa36b4dcb6937c4a26654b7e4097014882516671f05",
+      "bytes": 4499
+    },
+    {
+      "file": "source/gemini-map-import-extension/background.mjs",
+      "sha256": "3f05cd7266e81dc3f0fd2425f242094f2f25510436bc525f5644b457682a8f07",
+      "bytes": 17372
+    },
+    {
+      "file": "source/gemini-map-import-extension/collector.mjs",
+      "sha256": "9feda83262d810ac7119367568b2d42b27b1c0a7a349032728a631e22b9b67ea",
+      "bytes": 15359
+    },
+    {
+      "file": "source/gemini-map-import-extension/diagnostics.html",
+      "sha256": "e39e5decbd78d1d8ac8ef3ac5e21c9dca44b3754dc446c4a6d81cf5b001b9cf3",
+      "bytes": 293
+    },
+    {
+      "file": "source/gemini-map-import-extension/diagnostics.mjs",
+      "sha256": "8af9737d920d2e3aa6e8f7c536b26650faed09149824681756d17013c396a17f",
+      "bytes": 957
+    },
+    {
+      "file": "source/gemini-map-import-extension/manifest.json",
+      "sha256": "d61e2113630ebcb38eb437b3ca93062c7e50b1cde032fc508a3c306c45cf7cef",
+      "bytes": 808
+    },
+    {
+      "file": "source/gemini-map-import-extension/map-bridge.js",
+      "sha256": "3192f0f76cbb1802171b8d49cb96e989da9fb934e0eb1427591eb3449a927deb",
+      "bytes": 1621
+    },
+    {
+      "file": "source/gemini-map-import-extension/sequence.mjs",
+      "sha256": "bf6201f9ec9374a17d3b1409d30928bbc3587f973974e21799dbb3642d2e2e5a",
+      "bytes": 7051
+    },
+    {
+      "file": "tests/test-auto-continue.mjs",
+      "sha256": "6c4a61c03cfcace8a180f375a2008daad60fc163b6fd9defa5e9c234acd4dc96",
+      "bytes": 3695
+    },
+    {
+      "file": "tests/test-partial-collector.mjs",
+      "sha256": "1a51de84e4a45411975dcf9b0ceed7dfa9165c45f6fcbd4d62639d09da910fb3",
+      "bytes": 3953
+    },
+    {
+      "file": "tests/test-bulk-background.mjs",
+      "sha256": "6d28dd7b5641911bcc9e2b53230d414cc0caceba78ec247651ec7fdda1518a94",
+      "bytes": 5013
+    },
+    {
+      "file": "tests/test-publication-five-pages.mjs",
+      "sha256": "7717a2d156f5c7cdd4f30ad52a23e240fe9bdd0a47f1abcc4555237ea7cd0b28",
+      "bytes": 3603
+    },
+    {
+      "file": "review.txt",
+      "sha256": "d2067dd00485d963ed1c20958eda6204dd7c7a4c89c8e0fbf210f217ba720c05",
+      "bytes": 28657
+    },
+    {
+      "file": "package.json",
+      "sha256": "2faa7dcad5e106556b3e1b526c346ae9ebbe173274a0c96afee7a1a3db5315c2",
+      "bytes": 133
+    }
+  ]
+}

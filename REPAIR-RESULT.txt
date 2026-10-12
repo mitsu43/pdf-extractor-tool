@@ -1,0 +1,53 @@
+2026-10-12 修復候補の検証記録
+
+状態: 修復作業コピー。実際の生成済み5枚の救出は未完了。本番未反映。
+Web: v2026.10.12.3-rc1 (候補)
+同梱拡張: 1.4.4 (公開中ZIPから取得、権限追加なし)
+実機で応答した拡張: 1.4.2
+
+作業ベース
+元ZIP codex-web-handoff-20261011.zip のsource 19ファイル/tests 4ファイルから開始。
+公開中v2026.10.11.9のindex/sequence/bridgeと追加recoveryを比較して取り込み。
+公開中拡張1.4.4を同梱。iCloudマスターと登録済み拡張は上書きしていない。
+
+今回の追加変更
+1. 同一記事への部分再取得で説明が空の場合、取得済み説明を保持する。
+2. 0バイト画像を完了扱いにしない。復元不能な画像を文字列Blobへ変換しない。
+3. 完了照合に記事IDだけでなく正式タイトルと保存エラーの有無を含める。
+4. 拡張接続確認が失敗した場合、preparedをcheckingへ変更しない。
+5. upstreamの永続保存・安定した日付版キー・旧キュー保持・再送抑止を取り込む。
+
+コード検証
+既存4テスト: すべて通過。auto-continueのモック環境だけを新APIへ追随。
+追加test-repair-recovery.mjs: 通過。
+保存したFileのバイト列・説明の復元、日付分離、タイトル変更時の不一致、
+0バイト除外、説明保全、保存済み5件を除いた6-10件の選択、
+接続失敗時のprepared維持、保存失敗時の停止を確認。
+PDF試験は合成27ページを実関数で分割して5/5/5/5/5/2を確認。利用者PDFではない。
+
+Chrome実機で確認
+本番originの読み取り専用診断ボタンを実行。
+pdfExtractorDBに51記事。画像保存currentは0件、historyは空記録1件。
+旧キューと画像キャッシュの記録あり。画像の消失とは断定しない。
+拡張の応答は1件、version 1.4.2。
+テスト専用origin http://127.0.0.1:8042 に試験画像5件を保存し、
+試験タブの再読込後に5件を復元、その後10件までの保存・表示を確認。
+このブラウザ試験のGemini応答は模擬。利用者の生成済み5枚ではない。
+
+未確認と阻害要因
+実際のGemini生成済み5枚の会話照合・取り込み・本番表示は未確認。
+実際の次の5記事の生成は実行していない。
+登録済み1.4.2の更新が必要だが、ブラウザ操作ツールがchrome://extensionsを
+操作対象にできないため、登録先の確認・再読み込みを完了していない。
+未検証の候補を本番やiCloudマスターへ反映していない。
+PDF再抽出・画像再生成・既存ジョブ解除・既存データ削除は実施していない。
+
+再実行
+npm install
+node tests/test-auto-continue.mjs
+node tests/test-partial-collector.mjs
+node tests/test-bulk-background.mjs
+node tests/test-publication-five-pages.mjs
+node tests/test-repair-recovery.mjs
+tests/browser-recovery.html は使い捨ての試験originでのみ使用する。
+START-HERE.txtは元資料のまま保持している。最新作業結果はこのファイル。

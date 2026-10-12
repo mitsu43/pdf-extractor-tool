@@ -1,0 +1,30 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>修復候補・保存復元試験</title>
+<style>body{font:16px system-ui;margin:32px;line-height:1.8;color:#222}button{padding:10px;margin:8px}output{display:block;white-space:pre-wrap}table{border-collapse:collapse}td{border:1px solid #bbb;padding:8px}img{width:16px;height:16px}</style>
+<h1>保存・復元のブラウザ試験</h1><p>試験専用記事と画像を使用。Gemini送信・本番保存は行いません。</p>
+<button id="seed">試験用5件を保存</button><button id="restore">保存内容を復元</button>
+<button id="startFigureSequenceBtn">残り5件の処理を試験</button><button id="stopFigureSequenceBtn">停止</button>
+<output id="figureSequenceStatus"></output><output id="result"></output><table id="items"></table>
+<div hidden><input id="figureExtraThemeInput"><input id="figureConversationInput"><input type="checkbox" id="autoPublishFigures">
+<button id="buildFigureQueueBtn"></button><button id="nextFigurePromptBtn"></button><button id="importFigureConversationBtn"></button><button id="clearFigureFilesBtn"></button><button id="selectFigureFilesBtn"></button><button id="publishFiguresBtn"></button><button id="copyMissingFigurePromptBtn"></button><progress id="figureSequenceProgress"></progress></div>
+<script src="../source/pdf-extractor-tool/figure-recovery.js"></script>
+<script>
+const figureScope=FigureRecovery.scope('2099-01-01','test');
+const figureRecords=Array.from({length:10},(_,i)=>({gid:'1/1_test_'+(i+1),title:'試験記事'+(i+1),date:'1/1',edition:'test'}));
+const figureQueue=figureRecords;let figureAssignments=[];
+const explanation='【起】試験の状況【承】保存の仕組み【転】再読み込み【結】復元';
+const sample=()=>new File([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],'test.png',{type:'image/png'});
+let urls=[];
+function renderFigureQueue(){urls.forEach(URL.revokeObjectURL);urls=[];const body=document.getElementById('items');body.replaceChildren();for(const x of figureAssignments){const row=body.insertRow();row.insertCell().textContent=figureQueue[x.queueIndex].title;const image=new Image();image.src=URL.createObjectURL(x.file);urls.push(image.src);row.insertCell().append(image);row.insertCell().textContent=x.explanation;}document.getElementById('result').textContent=figureAssignments.length+'件の画像・説明を復元';}
+async function persistFigureAssignments(){await FigureRecovery.save(figureScope,figureQueue,figureAssignments);}
+async function restoreFigureAssignments(){figureAssignments=(await FigureRecovery.restore(figureScope,figureQueue)).items;renderFigureQueue();}
+function figureArticleComplete(a){return figureAssignments.some(x=>figureQueue[x.queueIndex]?.gid===a.gid&&FigureRecovery.complete(x));}
+async function buildFigureQueue(){}
+function figureLog(message){document.getElementById('result').textContent=message;}
+const PdfFigurePrompt={makeBatchJobs(records){return Array.from({length:Math.ceil(records.length/5)},(_,i)=>({id:crypto.randomUUID(),articles:records.slice(5*i,5*i+5)}));}};
+const FigureGeminiBridge={async check(){},async step(job){document.getElementById('result').textContent='模擬処理対象: '+job.articles.map(a=>a.title).join('、');return {status:'done',pack:{articles:job.articles}};}};
+const FigureUrlImport={decode:input=>JSON.parse(input.slice(input.indexOf('\n')+1))};
+async function assignFigureFiles(pack){const incoming=pack.articles.map(a=>({id:crypto.randomUUID(),queueIndex:figureQueue.findIndex(q=>q.gid===a.gid),file:sample(),explanation}));figureAssignments=FigureRecovery.merge(figureAssignments,incoming,figureQueue);await persistFigureAssignments();renderFigureQueue();}
+async function publishFigures(){throw new Error('試験では本番保存しません');}
+document.getElementById('seed').onclick=async()=>{await assignFigureFiles({articles:figureRecords.slice(0,5)});document.getElementById('seed').disabled=true;};
+document.getElementById('restore').onclick=restoreFigureAssignments;
+</script><script src="../source/pdf-extractor-tool/figure-sequence.js"></script></html>
