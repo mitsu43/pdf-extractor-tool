@@ -8,6 +8,7 @@
 
 | 対象 | バージョン | 更新日時（日本時間） | 更新内容サマリ | 反映・検証状況 | 変更の証拠 |
 | --- | --- | --- | --- | --- | --- |
+| ツール画面の更新表 | v2026.10.12.4 | 2026-10-12 16:10:34 | 日時・変更内容・未検証事項の表を画面上部に常時表示 | 表示だけの変更。独立5枚生成・記事ID照合・保存後の続行仕様は変更なし。PDF分割コード試験通過 | [e155fb5](https://github.com/mitsu43/pdf-extractor-tool/commit/e155fb53d197ebdd960f670bb58abc48290222e8) |
 | リポジトリ整理 | アプリ版変更なし | 2026-10-12 16:00:22 | 未使用ファイル45件削除、README整理 | GitHub main反映済み。参照・PDF分割・拡張処理のコード試験通過。機能修復ではない | [22c9de0](https://github.com/mitsu43/pdf-extractor-tool/commit/22c9de00f9582e33744748c7f0855d22058b5f75) |
 | 修復候補（source内） | v2026.10.12.3-rc1 | 2026-10-12 15:54:34 | 部分取得時の説明保全、空画像除外、接続確認先行 | sourceへ登録済み。本番用ルートには未反映。模擬試験・Chrome試験データで検証。実際の生成済み5枚は未確認 | [be972f2](https://github.com/mitsu43/pdf-extractor-tool/commit/be972f2a9858f05cc986dd10e6ea4f152ef46311) / [検証記録](REPAIR-RESULT.txt) |
 | 診断画面 | v2026.10.12.2 | 2026-10-12 15:28:48 | コンソール不要の診断結果ダウンロード | GitHub反映済み。本番URLで読み取り専用診断を実行し、51記事と拡張1.4.2の応答を確認 | [c332d98](https://github.com/mitsu43/pdf-extractor-tool/commit/c332d98641553b228694d4e5124c38f5aad736b0) / [診断画面](https://mitsu43.github.io/pdf-extractor-tool/connection-check.html) |
@@ -28,7 +29,7 @@
 
 | 場所 | 用途 |
 | --- | --- |
-| ルートの `index.html` と `figure-*.js` 等 | GitHub Pagesの公開用コード。コード内の版は `v2026.10.11.9` |
+| ルートの `index.html` と `figure-*.js` 等 | GitHub Pagesの公開用コード。画面表示版は `v2026.10.12.4`（生成処理はv2026.10.11.9から変更なし） |
 | `connection-check.html` | 記事・画像・進捗を変更しない診断画面 |
 | `downloads/` | 配布用の画像取込拡張1.4.4。インストール済みの版とは別 |
 | ルートの `manifest.json`、`background.mjs` 等 | 拡張機能のソース |
