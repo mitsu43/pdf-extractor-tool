@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="jszip.min.js"></script>
 <style>
 :root {
   --paper: #f7f3ea;
@@ -996,7 +997,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
       <div class="map-update-head">
         <span class="map-update-title">日経マップ data-1.json 更新</span>
         <div class="map-update-actions">
-          <button class="btn btn-secondary btn-sm" id="loadMapJsonBtn">既存data-1.json読み込み</button>
+          <button class="btn btn-secondary btn-sm" id="loadMapJsonBtn">既存JSON読み込み</button>
           <button class="btn btn-secondary btn-sm" id="repairMapJsonBtn">記事JSONを自動修正</button>
           <button class="btn btn-secondary btn-sm" id="mergeCurrentMapBtn">抽出結果を追加/差し替え</button>
           <button class="btn btn-secondary btn-sm" id="downloadMapJsonBtn" disabled>data-1.json保存</button>
@@ -1044,7 +1045,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
         <button class="btn btn-secondary btn-sm" id="deleteMapDateBtn">指定日付を削除</button>
       </div>
       <div class="map-update-note">
-        最初に既存data-1.jsonを1回読み込み、各PDFの抽出結果を順番に追加します。同じ日付・版の最初の追加で旧データを差し替え、2回目以降は重複を除いて積み上げます。
+        最初に現在のdata-1.json〜data-4.jsonをまとめて読み込み、抽出結果を追加します。同じページ・見出しの記事は既存IDのまま更新し、他の記事は残します。
       </div>
       <div class="map-update-log" id="mapUpdateLog">未読み込み</div>
     </div>
@@ -1104,8 +1105,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.06.4';
-const APP_VERSION_NAME = '図解画像出力修正版';
+const APP_VERSION = 'v2026.10.13.4';
+const APP_VERSION_NAME = '旧版コンテンツ維持・マップ連携修正版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -1156,7 +1157,11 @@ function newsChangeRule(fields) {
 function mapAnalysisValues(record) {
   const change = String(record.change_direction || record['世の中の変化と方向性'] || '').trim();
   const outlook = String(record.future_outlook || record['今後の展開予想'] || '').trim();
-  if(change && outlook) return { understanding: change, intent: outlook, analysis_mode: 'change-outlook-v1' };
+  if(change || outlook) return {
+    understanding: change || String(record['理解'] || record.key_insights || record['理解すべき内容'] || ''),
+    intent: outlook || String(record['思惑'] || record.intent_motive || record['思惑と狙い/本音'] || ''),
+    analysis_mode: 'change-outlook-v1'
+  };
   return { understanding: String(record['理解'] || record.key_insights || record['理解すべき内容'] || ''),
     intent: String(record['思惑'] || record.intent_motive || record['思惑と狙い/本音'] || ''),
     ...(record.analysis_mode === 'change-outlook-v1' ? {analysis_mode:record.analysis_mode} : {}) };
@@ -3543,8 +3548,8 @@ async function completeManualWorkflowIfReady() {
       const rows = buildMapRecordsFromCurrent();
       const meta = parseNikkeiFilename(state.pdfFile?.name || '');
       const filename = meta ? `${meta.isoDate.replaceAll('-', '')}${meta.edition}-data-1.json` : 'data-1.json';
-      downloadMapData(rows, filename);
-      log(`<strong>本番用JSONを自動保存</strong>: ${filename} (${rows.length}件)`, 'ok');
+      const savedFilename = await downloadMapData(rows, filename);
+      log(`<strong>本番用JSONを自動保存</strong>: ${savedFilename} (${mapArticles.length}件)`, 'ok');
     } else if (!validation.allOk) {
       log('<strong>自動保存を停止</strong>: 品質検査に未合格の項目があります', 'err');
     }
@@ -4243,8 +4248,8 @@ async function runExtraction(opts = {}) {
           const rows = buildMapRecordsFromCurrent();
           const meta = parseNikkeiFilename(state.pdfFile?.name || '');
           const filename = meta ? `${meta.isoDate.replaceAll('-', '')}${meta.edition}-data-1.json` : 'data-1.json';
-          downloadMapData(rows, filename);
-          log(`<strong>自動保存完了</strong>: ${filename} (${rows.length}件)`, 'ok');
+          const savedFilename = await downloadMapData(rows, filename);
+          log(`<strong>自動保存完了</strong>: ${savedFilename} (${mapArticles.length}件)`, 'ok');
         } else {
           log('<strong>自動保存を停止</strong>: 品質検査に未合格の項目があります', 'err');
         }
@@ -5033,7 +5038,8 @@ $('exportJson').addEventListener('click', () => {
 // =====================================================================
 let mapArticles = [];
 let mapDownloadFilename = 'data-1.json';
-const mapMergeSessionKeys = new Set();
+let mapBaseLoaded = false;
+let mapSplitBaseLoaded = false;
 
 const MAP_ED_LABEL = {
   morning: '朝刊',
@@ -5178,13 +5184,55 @@ function repairMapRecord(record, idx, fallbackDate = '', fallbackEdition = 'morn
   out.kws = Array.isArray(out.kws) ? out.kws : [];
   out.date = date;
   out.edition = edition;
-  out.gid = `${date}_${edition}_${no}`;
+  const prefix = `${date}_${edition}_`;
+  const savedNo = String(out.gid || '').startsWith(prefix) ? Number(String(out.gid).slice(prefix.length)) : 0;
+  if (Number.isSafeInteger(savedNo) && savedNo > 0) out.no = savedNo;
+  out.gid = `${prefix}${out.no}`;
   return out;
 }
 
 function repairMapRecords(records, fallbackDate = '', fallbackEdition = 'morning') {
-  return (records || []).map((record, idx) => repairMapRecord(record, idx, fallbackDate, fallbackEdition))
-    .map((record, idx) => ({ ...record, id: idx + 1 }));
+  const repaired = (records || []).map((record, idx) => repairMapRecord(record, idx, fallbackDate, fallbackEdition));
+  const used = new Set();
+  let nextId = repaired.reduce((max,a)=>Math.max(max,Number(a.id)||0),0);
+  return repaired.map(record => {
+    if (used.has(record.id)) record.id = ++nextId;
+    used.add(record.id);
+    return record;
+  });
+}
+
+function mapRecordIdentity(record) {
+  return [record.date, record.edition, String(record.men || ''), String(record.title || '').replace(/\s+/g, '').toLowerCase()].join('|');
+}
+
+function planMapMerge(existing, incoming) {
+  const all = repairMapRecords(existing).map(a=>({...a}));
+  const targets = [];
+  let nextId = all.reduce((max,a)=>Math.max(max,Number(a.id)||0),0);
+  for (const source of incoming) {
+    const record = repairMapRecord(source, targets.length);
+    if (!record.date || !record.title || !record.men) throw new Error('記事の日付・見出し・ページが不足しています');
+    const index = all.findIndex(a=>mapRecordIdentity(a)===mapRecordIdentity(record));
+    if (index >= 0) {
+      const old = all[index];
+      const merged = {...old};
+      for (const [key,value] of Object.entries(record)) {
+        if (value !== '' && value != null && (!Array.isArray(value) || value.length)) merged[key] = value;
+      }
+      Object.assign(merged, {id:old.id, no:old.no, gid:old.gid});
+      all[index] = merged;
+      targets.push(merged);
+    } else {
+      const scope = all.filter(a=>a.date===record.date && a.edition===record.edition);
+      const maxNo = scope.reduce((max,a)=>Math.max(max,Number(a.no)||0),0);
+      const no = record.no > maxNo ? record.no : maxNo + 1;
+      const added = {...record, id:++nextId, no, gid:`${record.date}_${record.edition}_${no}`};
+      all.push(added);
+      targets.push(added);
+    }
+  }
+  return {all, targets};
 }
 
 function buildMapRecordsFromCurrent() {
@@ -5192,7 +5240,8 @@ function buildMapRecordsFromCurrent() {
   if (!dateKey) throw new Error('日付を指定してください');
   const defaultEdition = $('mapEditionSelect')?.value || 'morning';
   const baseId = mapArticles.length > 0 ? Math.max(...mapArticles.map(a => parseInt(a.id, 10) || 0)) : 0;
-  return repairMapRecords(state.articles.map((a, idx) => articleToMapRecord(a, idx, dateKey, defaultEdition, baseId)), dateKey, defaultEdition);
+  const rows = state.articles.map((a, idx) => articleToMapRecord(a, idx, dateKey, defaultEdition, baseId));
+  return planMapMerge(mapArticles, rows).targets;
 }
 
 // =====================================================================
@@ -5419,47 +5468,50 @@ renderFigureQueue();
 
 function mergeMapRecords(records) {
   if (!records.length) return 0;
-  const grouped = new Map();
-  records.forEach(record => {
-    const key = `${record.date}|${record.edition}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(record);
-  });
-
-  let removed = 0;
-  grouped.forEach((incoming, key) => {
-    const [date, edition] = key.split('|');
-    const isTarget = article => article.date === date && article.edition === edition;
-    const existingTarget = mapArticles.filter(isTarget);
-    const others = mapArticles.filter(article => !isTarget(article));
-    const candidates = mapMergeSessionKeys.has(key) ? existingTarget.concat(incoming) : incoming;
-    if (!mapMergeSessionKeys.has(key)) removed += existingTarget.length;
-
-    const deduped = [];
-    const seen = new Set();
-    candidates.forEach((article, order) => {
-      const titleKey = String(article.title || '').replace(/\s+/g, '').toLowerCase();
-      const pageKey = String(article.men || '').match(/\d+/)?.[0] || '';
-      const identity = `${pageKey}|${titleKey}`;
-      if (seen.has(identity)) return;
-      seen.add(identity);
-      deduped.push({ article, order, page: parseInt(pageKey, 10) || 9999 });
-    });
-    deduped.sort((a, b) => a.page - b.page || a.order - b.order);
-    const target = deduped.map((entry, idx) => ({
-      ...entry.article,
-      no: idx + 1,
-      gid: `${date}_${edition}_${idx + 1}`,
-    }));
-    mapArticles = others.concat(target);
-    mapMergeSessionKeys.add(key);
-  });
-  mapArticles = repairMapRecords(mapArticles);
-  return removed;
+  mapArticles = planMapMerge(mapArticles, records).all;
+  return 0;
 }
 
-function downloadMapData(records, filename = mapDownloadFilename) {
-  const blob = new Blob([JSON.stringify(records)], { type: 'application/json' });
+function splitMapData(records, maxBytes = 20 * 1024 * 1024) {
+  const chunks = [[]];
+  let bytes = 2;
+  const encoder = new TextEncoder();
+  for (const record of records) {
+    const size = encoder.encode(JSON.stringify(record)).length;
+    if (size + 2 > maxBytes) throw new Error('単一記事が保存容量を超えています。記事は保持しています。');
+    const chunk = chunks[chunks.length - 1];
+    if (bytes + size + (chunk.length ? 1 : 0) > maxBytes) {
+      if (chunks.length === 4) throw new Error('4ファイルの保存容量を超えています。既存データは変更していません。');
+      chunks.push([]);
+      bytes = 2;
+    }
+    const target = chunks[chunks.length - 1];
+    bytes += size + (target.length ? 1 : 0);
+    target.push(record);
+  }
+  while (chunks.length < 4) chunks.push([]);
+  return chunks;
+}
+
+async function downloadMapData(records, filename = mapDownloadFilename) {
+  if (records !== mapArticles && !mapBaseLoaded) {
+    throw new Error('既存記事を残すため、先に現在のdata-1.json〜data-4.jsonを読み込んでください。抽出済みの記事は保持しています。');
+  }
+  if (records !== mapArticles && mapBaseLoaded) {
+    mergeMapRecords(records);
+    records = mapArticles;
+  }
+  let blob;
+  if (mapSplitBaseLoaded) {
+    if (typeof JSZip !== 'function') throw new Error('ZIP保存ライブラリを読み込めません。記事は保持しています。');
+    const zip = new JSZip();
+    splitMapData(records).forEach((chunk,i)=>zip.file(`data-${i+1}.json`,JSON.stringify(chunk)));
+    blob = await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+    filename = 'news-map-data.zip';
+  } else {
+    blob = new Blob([JSON.stringify(records)], { type: 'application/json' });
+    if (blob.size > 24 * 1024 * 1024) throw new Error('容量を超えるため、既存data-1.json〜data-4.jsonをまとめて読み込み、ZIPで保存してください。記事は保持しています。');
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -5468,13 +5520,14 @@ function downloadMapData(records, filename = mapDownloadFilename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  return filename;
 }
 
-$('exportMapJson').addEventListener('click', () => {
+$('exportMapJson').addEventListener('click', async () => {
   try {
     const rows = buildMapRecordsFromCurrent();
-    downloadMapData(rows);
-    mapLog(`抽出結果 ${rows.length}件を data.json として保存しました`);
+    const savedFilename = await downloadMapData(rows);
+    mapLog(`抽出結果 ${rows.length}件を追加し、既存記事を含めた ${mapArticles.length}件を ${savedFilename}に保存しました`);
   } catch (err) {
     alert(err.message || err);
   }
@@ -5484,17 +5537,27 @@ $('loadMapJsonBtn').addEventListener('click', () => {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json,application/json';
+  input.multiple = true;
   input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     try {
-      const data = JSON.parse(await file.text());
-      mapArticles = repairMapRecords(Array.isArray(data) ? data : (data.articles || []));
-      mapDownloadFilename = /\.json$/i.test(file.name) ? file.name : 'data-1.json';
-      mapMergeSessionKeys.clear();
+      const groups = await Promise.all(files.map(async file => {
+        const data = JSON.parse(await file.text());
+        const rows = Array.isArray(data) ? data : data.articles;
+        if (!Array.isArray(rows)) throw new Error(`${file.name}: 記事配列がありません`);
+        return rows;
+      }));
+      const splitBase = ['data-1.json','data-2.json','data-3.json','data-4.json'].every(name=>files.some(f=>f.name===name));
+      if (files.length > 1 && !splitBase) throw new Error('分割JSONはdata-1.json〜data-4.jsonの4ファイルをまとめて選択してください。');
+      const loaded = repairMapRecords(groups.flat());
+      mapArticles = loaded;
+      mapDownloadFilename = files.length === 1 ? files[0].name : 'data-1.json';
+      mapBaseLoaded = true;
+      mapSplitBaseLoaded = splitBase;
       $('downloadMapJsonBtn').disabled = false;
-      $('downloadMapJsonBtn').textContent = `${mapDownloadFilename}保存`;
-      mapLog(`${mapDownloadFilename}を読み込み: ${mapArticles.length}件`);
+      $('downloadMapJsonBtn').textContent = mapSplitBaseLoaded ? '更新JSON一式をZIP保存' : `${mapDownloadFilename}保存`;
+      mapLog(`${files.map(f=>f.name).join(' / ')}を読み込み: ${mapArticles.length}件`);
     } catch (err) {
       alert('JSONを読み込めません: ' + (err.message || err));
     }
@@ -5545,10 +5608,12 @@ $('deleteMapDateBtn').addEventListener('click', () => {
   mapLog(`${dateKey}: ${before - mapArticles.length}件削除`);
 });
 
-$('downloadMapJsonBtn').addEventListener('click', () => {
-  mapArticles = repairMapRecords(mapArticles);
-  downloadMapData(mapArticles, mapDownloadFilename);
-  mapLog(`${mapDownloadFilename}を保存: ${mapArticles.length}件`);
+$('downloadMapJsonBtn').addEventListener('click', async () => {
+  try {
+    mapArticles = repairMapRecords(mapArticles);
+    await downloadMapData(mapArticles, mapDownloadFilename);
+    mapLog(`${mapSplitBaseLoaded ? 'news-map-data.zip' : mapDownloadFilename}を保存: ${mapArticles.length}件`);
+  } catch (err) { alert(err.message || err); }
 });
 
 if ($('mapDateInput') && !$('mapDateInput').value) {
