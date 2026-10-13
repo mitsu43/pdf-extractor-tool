@@ -995,11 +995,11 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     </div>
     <div class="map-update-panel">
       <div class="map-update-head">
-        <span class="map-update-title">日経マップ data-1.json 更新</span>
+        <span class="map-update-title">日経マップ JSON 更新</span>
         <div class="map-update-actions">
           <button class="btn btn-secondary btn-sm" id="loadMapJsonBtn">既存JSON読み込み</button>
           <button class="btn btn-secondary btn-sm" id="repairMapJsonBtn">記事JSONを自動修正</button>
-          <button class="btn btn-secondary btn-sm" id="mergeCurrentMapBtn">抽出結果を追加/差し替え</button>
+          <button class="btn btn-secondary btn-sm" id="mergeCurrentMapBtn">抽出結果を追加・更新</button>
           <button class="btn btn-secondary btn-sm" id="downloadMapJsonBtn" disabled>data-1.json保存</button>
         </div>
       </div>
@@ -1010,12 +1010,12 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
           <div>見出し・内容・思惑・理解・クイズ・地図JSONを変換</div>
         </div>
         <div class="map-io-card">
-          <strong>INPUT 2: 既存data-1.json</strong>
+          <strong>INPUT 2: 既存JSON</strong>
           <div>読み込み済み: <output id="mapInputExistingCount">0</output> 件</div>
           <div>同じ日付・版は追加時に自動差し替え</div>
         </div>
         <div class="map-io-card">
-          <strong>OUTPUT: data-1.json</strong>
+          <strong>OUTPUT: 更新JSON / ZIP</strong>
           <div>保存対象: <output id="mapOutputCount">0</output> 件</div>
           <div>id/no/gid/date/edition/座標を自動修正して保存</div>
         </div>
