@@ -632,28 +632,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <span class="version-status" id="versionStatus">この画面の読込版（本番の最新版かは未確認）</span>
     <button type="button" class="update-tool-btn" id="updateToolBtn">画面を再読み込み</button>
   </div>
-  <section aria-labelledby="releaseHistoryHeading" style="margin-top:16px;line-height:1.6;font-size:14px">
-    <h2 id="releaseHistoryHeading" style="font-size:18px">バージョン・更新日時・確認状況</h2>
-    <p><strong>今回の更新は抽出処理の改善です。1ページ・最大12記事ずつ継続し、短信の分析空欄を許可します。継続取込・引用除去・既存記事保持はコード試験済み。Geminiでの実PDF再抽出品質は未検証です。</strong></p>
-    <p>日時は日本時間。過去の日時はGitHubのコミット記録です。拡張の端末への適用日時とは異なります。<a href="https://github.com/mitsu43/pdf-extractor-tool#バージョン更新履歴日本時間" target="_blank" rel="noopener">GitHubの更新履歴・変更の証拠</a></p>
-    <div style="overflow-x:auto">
-    <table id="releaseHistoryTable" style="width:100%;border-collapse:collapse;text-align:left;min-width:640px">
-      <thead><tr><th scope="col">対象・版</th><th scope="col">更新日時（日本時間）</th><th scope="col">更新内容</th><th scope="col">確認状況</th></tr></thead>
-      <tbody>
-        <tr><td>この画面 v2026.10.13.1</td><td>2026-10-13 更新</td><td>1ページ分割・最大12記事ずつ継続</td><td>短信の空欄許可・版別コラム・座標は別工程・引用タグ除去。JSON追加保存は維持</td></tr>
-        <tr><td>v2026.10.12.4</td><td>2026-10-12 16:09 作成<br><a href="https://github.com/mitsu43/pdf-extractor-tool/commits/main/index.html">反映日時の記録</a></td><td>更新表を画面上部に常時表示</td><td>表示のみ変更。抽出・保存・生成処理は変更なし</td></tr>
-        <tr><td>GitHubのREADME</td><td>2026-10-12 16:04:53</td><td>バージョン・更新日時・検証状況の表を追加</td><td>READMEのみ。ツール画面はこの時点で未変更</td></tr>
-        <tr><td>不要ファイル整理</td><td>2026-10-12 16:00:22</td><td>未使用45ファイルを削除</td><td>GitHub反映済み。機能修復ではありません</td></tr>
-        <tr><td>修復候補 v2026.10.12.3-rc1</td><td>2026-10-12 15:54:34</td><td>部分取得時の説明保全・接続確認先行</td><td>source内のみ。この画面の処理には未反映。実データ未検証</td></tr>
-        <tr><td>診断画面 v2026.10.12.2</td><td>2026-10-12 15:28:48</td><td>診断結果のダウンロード</td><td>本番画面で51記事・拡張1.4.2の応答を確認</td></tr>
-        <tr><td>抽出処理 v2026.10.11.9<br>配布拡張 1.4.4</td><td>2026-10-12 06:48:33</td><td>画像・説明の保存復元と再送抑止</td><td>コード試験済み。Geminiを含む実動作は未確認。端末の拡張更新も未確認</td></tr>
-      </tbody>
-    </table>
-    </div>
-    <p>この表示更新のために、PDFの再抽出・画像の再生成・保存データの削除を行う必要はありません。</p>
-  </section>
   <details style="margin-top:10px;line-height:1.8;font-size:13px">
-    <summary>過去の変更記録・再開手順（実動作の保証ではありません）</summary>
+    <summary>変更履歴・再抽出が必要か・再開手順</summary>
     <p><strong>今回の更新だけならPDFの再抽出は不要です。</strong>抽出済みJSONと画像はそのまま使えます。記事の欠落・誤抽出がある場合だけ、その範囲を確認・追加してください。</p>
     <table style="width:100%;border-collapse:collapse;text-align:left">
       <thead><tr><th>版 / 対象</th><th>変更内容</th><th>既存データ・再開</th></tr></thead>
@@ -818,8 +798,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
   <div class="form-grid three">
     <div class="field">
       <label>分割バッチサイズ (ページ)</label>
-      <input type="number" id="batchSize" value="1" min="1" max="5">
-      <span class="desc">日経新聞の抽出は1ページずつ・1回答最大12記事。公開用PDFは従来どおり5ページずつ分割します。</span>
+      <input type="number" id="batchSize" value="5" min="1" max="5">
+      <span class="desc">日経新聞は5ページずつ添付します。1回答最大12記事、残りは同じ会話でNEXT_NOから続行します。公開用PDFも従来どおり5ページ単位です。</span>
     </div>
     <div class="field">
       <label>呼出間隔（秒）</label>
@@ -1100,8 +1080,6 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
           <button class="btn btn-secondary btn-sm" id="stopFigureSequenceBtn" disabled>停止</button>
           <label><input type="checkbox" id="autoPublishFigures" checked> 完了後サイト保存</label>
           <output id="figureSequenceStatus" role="status"></output>
-          <output id="figureBridgeStatus" role="status">拡張：操作時に接続確認</output>
-          <a href="downloads/gemini-map-import-extension-1.4.4.zip" download>画像取込拡張1.4.4をダウンロード</a>
           <button class="btn btn-secondary btn-sm" id="copyMissingFigurePromptBtn" hidden>不足記事だけの指示をコピー</button>
           <button class="btn btn-primary btn-sm" id="publishFiguresBtn" disabled>まとめてサイト保存</button>
           <a class="btn btn-secondary btn-sm" href="https://nikkei-map.pages.dev/" target="nikkei_map">記事マップ</a>
@@ -1161,8 +1139,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.13.1';
-const APP_VERSION_NAME = '1ページ分割・12記事継続・根拠優先抽出';
+const APP_VERSION = 'v2026.10.13.2';
+const APP_VERSION_NAME = '5ページ単位・12記事継続・根拠優先抽出';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -2031,7 +2009,7 @@ function calculateCost() {
   const pricing = PRICING[model];
   if (!pricing) return null;
 
-  const batchSize = state.preset==='nikkei'?1:parseInt($('batchSize').value)||5;
+  const batchSize = state.preset==='nikkei'?5:parseInt($('batchSize').value)||5;
   const pages = state.pdfPageCount;
   const calls = Math.ceil(pages / batchSize);
   const itemsPerPage = state.schema.itemsPerPage || ITEMS_PER_PAGE_DEFAULT;
@@ -2424,7 +2402,7 @@ function applyNikkeiFileMetadata(filename) {
   if ($('mapDateInput')) $('mapDateInput').value = meta.isoDate;
   if ($('mapEditionSelect')) $('mapEditionSelect').value = MAP_ED_FROM_CODE[meta.edition];
   if ($('batchSize')) {
-    $('batchSize').value = '1';
+    $('batchSize').value = '5';
     $('batchSize').max = '5';
   }
   return true;
@@ -2446,8 +2424,8 @@ function updateStartBtn() {
 }
 $('runMode').addEventListener('change', updateStartBtn);
 $('batchSize').addEventListener('change', () => {
-  if (state.preset === 'nikkei' && Number($('batchSize').value) > 1) {
-    $('batchSize').value = '1';
+  if (state.preset === 'nikkei' && Number($('batchSize').value) !== 5) {
+    $('batchSize').value = '5';
     log('新聞PDFは安全のため5ページ単位に自動修正しました', 'info');
   }
   updateCostEstimate();
@@ -3164,7 +3142,7 @@ function startManualWorkflow(opts = {}) {
   state.running = true;
   state.articles = [];
 
-  const batchSize = 1;
+  const batchSize = testOnly ? 1 : 5;
   const maxPages = testOnly ? 1 : state.pdfPageCount;
   // Build batch definitions
   const batches = [];
@@ -4092,7 +4070,7 @@ async function runExtraction(opts = {}) {
 
   // Test mode: process only 1 page, batchSize=1
   const requestedBatchSize = Math.max(2, parseInt($('batchSize').value) || 5);
-  const userBatchSize = testOnly ? 1 : (state.preset === 'nikkei' ? 1 : requestedBatchSize);
+  const userBatchSize = testOnly ? 1 : (state.preset === 'nikkei' ? 5 : requestedBatchSize);
   const maxRetry = parseInt($('maxRetry').value) || 4;
   const enrich = state.schema.enrichFields && $('enrichFM').checked;
   const strict = $('strictMode').checked;
@@ -5342,32 +5320,6 @@ let figureAssignments = [];
 let figureRecords = [];
 let figureFingerprint = '';
 let figureBusy = false;
-let figureScope = '';
-let figureStorageWrites = Promise.resolve();
-let figureStorageError = null;
-function persistFigureAssignments() {
-  if (!figureScope) return Promise.resolve();
-  const scope=figureScope,queue=figureQueue.slice(),items=figureAssignments.map(x=>({...x}));
-  const conversation=$('figureConversationInput').value.trim();
-  const task=figureStorageWrites.catch(()=>{}).then(()=>FigureRecovery.save(scope,queue,items,conversation));
-  figureStorageWrites=task;
-  task.then(()=>{figureStorageError=null;},e=>{figureStorageError=e;figureLog('端末への保存に失敗：'+e.message+'。画像は画面に保持しています。再読み込みしないでください。','warn');});
-  return task;
-}
-async function restoreFigureAssignments() {
-  await figureStorageWrites;
-  if (figureStorageError) throw figureStorageError;
-  const scope=FigureRecovery.scope($('mapDateInput').value,$('mapEditionSelect').value);
-  if (figureScope!==scope) throw new Error('日付・版が変わりました。記事を確定し直してください。');
-  const restored=await FigureRecovery.restore(scope,figureQueue);
-  const ids=new Set(figureAssignments.map(x=>x.id));
-  figureAssignments.push(...restored.items.filter(x=>!ids.has(x.id)));
-  if (!$('figureConversationInput').value.trim()&&restored.conversationUrl) $('figureConversationInput').value=restored.conversationUrl;
-  renderFigureQueue();
-}
-function figureArticleComplete(a) {
-  return figureAssignments.some(x=>figureQueue[x.queueIndex]?.gid===a.gid&&FigureRecovery.complete(x));
-}
 
 function figureLog(message, kind = '') {
   const el = $('figurePublishLog');
@@ -5449,22 +5401,19 @@ function renderFigureQueue() {
     select.value = String(figureAssignments[index].queueIndex);
     select.addEventListener('change', () => {
       figureAssignments[index].queueIndex = Number(select.value);
-      delete figureAssignments[index].siteSavedAt;
-      persistFigureAssignments();
       renderFigureQueue();
     });
   });
   document.querySelectorAll('[data-figure-theme]').forEach(input => {
     const index = Number(input.dataset.figureTheme);
-    input.addEventListener('change', () => { figureAssignments[index].theme = input.value.trim() || '記事全体'; delete figureAssignments[index].siteSavedAt; persistFigureAssignments(); });
+    input.addEventListener('change', () => { figureAssignments[index].theme = input.value.trim() || '記事全体'; });
   });
-  document.querySelectorAll('[data-figure-explanation]').forEach(input=>input.addEventListener('change',()=>{figureAssignments[Number(input.dataset.figureExplanation)].explanation=input.value;delete figureAssignments[Number(input.dataset.figureExplanation)].siteSavedAt;persistFigureAssignments();renderFigureQueue();}));
+  document.querySelectorAll('[data-figure-explanation]').forEach(input=>input.addEventListener('change',()=>{figureAssignments[Number(input.dataset.figureExplanation)].explanation=input.value;renderFigureQueue();}));
 }
 
-async function buildFigureQueue() {
+function buildFigureQueue() {
   const records = buildMapRecordsFromCurrent();
-  if(figureScope)await persistFigureAssignments();
-  figureScope=FigureRecovery.scope($('mapDateInput').value,$('mapEditionSelect').value);
+  if(figureAssignments.length&&!confirm('取り込み済みの画像を解除して、記事を再確定しますか？'))return;
   figureRecords=records;
   figureFingerprint=JSON.stringify(records);
   figureQueue = records.map((record, index) => ({
@@ -5479,21 +5428,17 @@ async function buildFigureQueue() {
   }));
   figureAssignments = [];
   $('figureFilesInput').value = '';
-  await restoreFigureAssignments();
   renderFigureQueue();
   figureLog(`このPDF全体の${figureQueue.length}記事を確定しました。まとめてGeminiへ渡せます。`, 'ok');
 }
 
 async function openBulkFigurePrompt() {
-  if (!figureQueue.length) await buildFigureQueue();
+  if (!figureQueue.length) buildFigureQueue();
   if (!figureQueue.length) return;
   const theme = $('figureExtraThemeInput').value.trim();
-  await restoreFigureAssignments();
-  const selected=figureRecords.filter(a=>!figureArticleComplete(a));
-  if(selected.some(a=>figureAssignments.some(x=>figureQueue[x.queueIndex]?.gid===a.gid))){figureLog('画像取得済み・説明未取得の記事があります。既存会話から取り込んでください。新しい画像指示は作りません。','warn');return;}
+  const selected=figureRecords.filter(a=>!figureAssignments.some(x=>figureQueue[x.queueIndex]?.gid===a.gid));
   if(!selected.length){figureLog('全記事の画像を取り込み済みです。','ok');return;}
-  const job=await FigureSequence.manualJob(selected,theme);
-  const prompt = job.prompt;
+  const prompt = PdfFigurePrompt.makePrompt(selected,theme);
   const conversation=$('figureConversationInput').value.trim();
   if(conversation&&!/^https:\/\/gemini\.google\.com\/app\/[a-zA-Z0-9_-]+$/.test(conversation)){figureLog('Geminiの会話URLを確認してください。','warn');return;}
   const targets=selected.slice(0,5);
@@ -5510,7 +5455,7 @@ async function openBulkFigurePrompt() {
 }
 
 async function assignFigureFiles(fileList) {
-  if(figureBusy)throw new Error('画像処理中です。');
+  if(figureBusy)return;
   figureBusy=true;
   try {
   const zipFiles=[...fileList].filter(file=>/\.zip$/i.test(file.name));
@@ -5526,7 +5471,6 @@ async function assignFigureFiles(fileList) {
     }
     const seen=new Set();for(const item of imported){if(seen.has(item.queueIndex))throw new Error('同じ記事の画像が重複しています');seen.add(item.queueIndex);}
     figureAssignments=[...figureAssignments.filter(a=>!seen.has(a.queueIndex)),...imported];
-    await persistFigureAssignments();
     figureLog(`${imported.length}記事の画像・説明を照合して取り込みました。保存すると本文も同時に反映されます。`,'ok');
     return;
   }
@@ -5546,24 +5490,17 @@ async function assignFigureFiles(fileList) {
     if(metadata&&metadata.title!==article.title)throw new Error('記事タイトルが一致しません：'+metadata.title);
     return {id:figureSafeId(), file, queueIndex, explanation:metadata?.explanation||file.geminiExplanation||'', theme:encoded?'記事全体':figureThemeFromFilename(file.name), createdAt:new Date().toISOString()};
   });
-  const assigned=nextAssignments.filter(a=>a.queueIndex>=0);
-  if(new Set(assigned.map(a=>a.queueIndex)).size!==assigned.length)throw new Error('同じ記事の画像が重複しています。');
-  for(const item of nextAssignments)await createImageBitmap(item.file).then(bitmap=>bitmap.close());
   const totalBytes = nextAssignments.reduce((sum, item) => sum + item.file.size, 0);
   const replaced=new Set(nextAssignments.filter(a=>a.queueIndex>=0).map(a=>a.queueIndex));
   figureAssignments = [...figureAssignments.filter(a=>!replaced.has(a.queueIndex)),...nextAssignments];
-  await persistFigureAssignments();
   renderFigureQueue();
   figureLog(`${files.length}枚を取り込みました。合計${figureFormatBytes(totalBytes)}。保存時は容量・件数に応じて自動分割します。`, 'ok');
-  }catch(error){figureLog(`取込を中止しました：${error.message}。既存の取込内容は保持しています。`,'warn');throw error;}
+  }catch(error){figureLog(`取込を中止しました：${error.message}。既存の取込内容は保持しています。`,'warn');}
   finally{figureBusy=false;renderFigureQueue();}
 }
 
-async function clearFigureFiles() {
-  if(!confirm('画像の選択を解除しますか？解除前のデータは端末の履歴に残します。'))return;
-  await persistFigureAssignments();
+function clearFigureFiles() {
   figureAssignments = [];
-  await persistFigureAssignments();
   $('figureFilesInput').value = '';
   renderFigureQueue();
   figureLog('画像の選択だけ解除しました。記事一覧は保持しています。');
@@ -5600,7 +5537,7 @@ async function publishFigures() {
   if(figureBusy)return;
   if(JSON.stringify(buildMapRecordsFromCurrent())!==figureFingerprint){figureLog('記事・日付・版が変更されています。「記事を確定」からやり直してください。','warn');return;}
   const token = $('figurePublishTokenInput').value.trim();
-  const items = figureManifestItems().filter(item=>['起','承','転','結'].every(s=>item.explanation.includes('【'+s+'】')));
+  const items = figureManifestItems().filter(item=>item.explanation.trim());
   const assignments=items.map(item=>figureAssignments.find(a=>a.id===item.id));
   const pending=figureAssignments.length-assignments.length;
   if (!token) { $('figureAdvanced').open=true;$('figurePublishTokenInput').focus();$('figureSequenceStatus').textContent='設定内のCloudflare公開キーを入力してください。';figureLog('Cloudflare公開キーを入力してください。', 'warn'); return; }
@@ -5620,10 +5557,7 @@ async function publishFigures() {
       const response=await fetch(`${FIGURE_API_BASE}/api/article-bundles/commit`,{method:'POST',headers:{'X-Article-Publish-Token':token},body:form});
       const result=await response.json().catch(()=>({}));
       if(!response.ok||!result.ok)throw new Error(`${uploaded}枚は保存済み。${result.error||`HTTP ${response.status}`}`);
-      if(result.uploaded!==indices.length)throw new Error('サイトから保存件数の一致を確認できません。取込画像を保持して停止します。');
       uploaded+=result.uploaded;
-      for(const i of indices)assignments[i].siteSavedAt=new Date().toISOString();
-      await persistFigureAssignments();
     }
     localStorage.setItem(FIGURE_TOKEN_STORAGE_KEY, token);
     $('figureSequenceStatus').textContent=`${uploaded}枚と記事・説明をサイトに保存しました。`+(pending?` 未対応・説明未取得の${pending}枚は公開せず、設定内に保持しています。`:'');
@@ -5648,8 +5582,8 @@ function downloadFigureManifest() {
   URL.revokeObjectURL(url);
 }
 
-$('buildFigureQueueBtn').addEventListener('click', async () => { try { await buildFigureQueue(); } catch (error) { figureLog(error.message || String(error), 'warn'); } });
-$('nextFigurePromptBtn').addEventListener('click', ()=>openBulkFigurePrompt().catch(e=>figureLog(e.message,'warn')));
+$('buildFigureQueueBtn').addEventListener('click', () => { try { buildFigureQueue(); } catch (error) { figureLog(error.message || String(error), 'warn'); } });
+$('nextFigurePromptBtn').addEventListener('click', openBulkFigurePrompt);
 $('importFigureConversationBtn').addEventListener('click',async()=>{
   if(figureBusy)return;
   if(!figureQueue.length){figureLog('先に記事を確定してください。','warn');return;}
@@ -5658,17 +5592,15 @@ $('importFigureConversationBtn').addEventListener('click',async()=>{
     const url=$('figureConversationInput').value.trim();
     if(url&&!/^https:\/\/gemini\.google\.com\/app\/[a-zA-Z0-9_-]+\/?$/.test(url))throw new Error('Geminiの会話URLを確認してください。');
     figureLog('Geminiから画像・説明を取り込み中…');
-    const files=await FigureGeminiBridge.request(url,figureRecords,async(part,conversation)=>{
-      $('figureConversationInput').value=conversation;
-      await assignFigureFiles(part);
-    });
+    const files=await FigureGeminiBridge.request(url,figureRecords);
+    await assignFigureFiles(files);
     const warnings=[...new Set(files.flatMap(f=>f.geminiWarnings||[]))];
     if(warnings.length)figureLog('一部未取得：'+warnings.join(' / '),'warn');
   }catch(error){figureLog(error.message,'warn');}finally{button.disabled=false;}
 });
 $('selectFigureFilesBtn').addEventListener('click', () => $('figureFilesInput').click());
-$('figureFilesInput').addEventListener('change', event => assignFigureFiles(event.target.files).catch(e=>figureLog(e.message,'warn')));
-$('clearFigureFilesBtn').addEventListener('click', ()=>clearFigureFiles().catch(e=>figureLog(e.message,'warn')));
+$('figureFilesInput').addEventListener('change', event => assignFigureFiles(event.target.files));
+$('clearFigureFilesBtn').addEventListener('click', clearFigureFiles);
 $('checkFigureConnectionBtn').addEventListener('click', checkFigureConnection);
 $('publishFiguresBtn').addEventListener('click', publishFigures);
 $('downloadFigureManifestBtn').addEventListener('click', downloadFigureManifest);
@@ -5677,7 +5609,7 @@ $('figureConversationInput').value='';
 $('figurePublishTokenInput').addEventListener('change', () => localStorage.setItem(FIGURE_TOKEN_STORAGE_KEY, $('figurePublishTokenInput').value.trim()));
 ['dragenter','dragover'].forEach(type => $('figureDropZone').addEventListener(type, event => { event.preventDefault(); $('figureDropZone').classList.add('dragover'); }));
 ['dragleave','drop'].forEach(type => $('figureDropZone').addEventListener(type, event => { event.preventDefault(); $('figureDropZone').classList.remove('dragover'); }));
-$('figureDropZone').addEventListener('drop', event => { if (figureQueue.length) assignFigureFiles(event.dataTransfer.files).catch(e=>figureLog(e.message,'warn')); else figureLog('先に「図解一覧を作成」を押してください。', 'warn'); });
+$('figureDropZone').addEventListener('drop', event => { if (figureQueue.length) assignFigureFiles(event.dataTransfer.files); else figureLog('先に「図解一覧を作成」を押してください。', 'warn'); });
 $('figureDropZone').addEventListener('click', () => { if (figureQueue.length) $('figureFilesInput').click(); else figureLog('先に「図解一覧を作成」を押してください。', 'warn'); });
 $('figureDropZone').addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); $('figureDropZone').click(); } });
 renderFigureQueue();
@@ -5947,8 +5879,7 @@ function showRestoreBanner(session) {
 <script src="pdf-figure-prompt.js?v=20261010-pdf2"></script>
 <script src="figure-job-prompt.js?v=20261011-five-dialogue"></script>
 <script src="figure-url-import.js?v=20261010-pdf2"></script>
-<script src="figure-recovery.js?v=20261011-recovery9"></script>
-<script src="figure-gemini-bridge.js?v=20261011-recovery9"></script>
-<script src="figure-sequence.js?v=20261011-recovery9"></script>
+<script src="figure-gemini-bridge.js?v=20261010-batch10"></script>
+<script src="figure-sequence.js?v=20261011-auto-continue"></script>
 </body>
 </html>
