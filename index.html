@@ -634,7 +634,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
   </div>
   <section aria-labelledby="releaseHistoryHeading" style="margin-top:16px;line-height:1.6;font-size:14px">
     <h2 id="releaseHistoryHeading" style="font-size:18px">バージョン・更新日時・確認状況</h2>
-    <p><strong>今回変更したのは、この更新履歴の表示です。生成済み5枚の取り込み・次の5記事への自動移行は、実データでの確認が終わっていません。</strong></p>
+    <p><strong>今回の更新は抽出処理の改善です。1ページ・最大12記事ずつ継続し、短信の分析空欄を許可します。継続取込・引用除去・既存記事保持はコード試験済み。Geminiでの実PDF再抽出品質は未検証です。</strong></p>
     <p>日時は日本時間。過去の日時はGitHubのコミット記録です。拡張の端末への適用日時とは異なります。<a href="https://github.com/mitsu43/pdf-extractor-tool#バージョン更新履歴日本時間" target="_blank" rel="noopener">GitHubの更新履歴・変更の証拠</a></p>
     <div style="overflow-x:auto">
     <table id="releaseHistoryTable" style="width:100%;border-collapse:collapse;text-align:left;min-width:640px">
@@ -819,7 +819,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
     <div class="field">
       <label>分割バッチサイズ (ページ)</label>
       <input type="number" id="batchSize" value="1" min="1" max="5">
-      <span class="desc">Gemini手動連携・公開用PDFともに5ページずつ分割します。</span>
+      <span class="desc">日経新聞の抽出は1ページずつ・1回答最大12記事。公開用PDFは従来どおり5ページずつ分割します。</span>
     </div>
     <div class="field">
       <label>呼出間隔（秒）</label>
