@@ -1105,8 +1105,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.13.4';
-const APP_VERSION_NAME = '旧版コンテンツ維持・マップ連携修正版';
+const APP_VERSION = 'v2026.10.14.6';
+const APP_VERSION_NAME = 'Gemini Flash・元PDFページ番号統一版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -2803,21 +2803,34 @@ function buildSchemaDescription(fields) {
   return fields.map((f, i) => {
     const enumStr = f.enumValues ? ` ※値は次のいずれか: ${f.enumValues}` : '';
     const reqStr = f.required ? ' [必須]' : '';
-    return `  - ${f.key} (${f.type})${reqStr}: ${f.desc}${enumStr}`;
+    const desc = f.key === 'page' ? '元PDFファイルの先頭を1として数えた通しページ番号（整数）。紙面に印字された面番号・ページ番号、PDFのページラベル、分割PDF内の相対番号は使用禁止。下のページ対応表を優先する。' : f.desc;
+    return `  - ${f.key} (${f.type})${reqStr}: ${desc}${enumStr}`;
   }).join('\n');
 }
 
-function buildSchemaExample(fields, startNo) {
+function buildSchemaExample(fields, startNo, startPage = 1) {
   const ex = {};
   fields.forEach(f => {
     if (f.key === 'no') ex[f.key] = startNo;
-    else if (f.key === 'page') ex[f.key] = 1;
+    else if (f.key === 'page') ex[f.key] = startPage;
     else if (f.type === 'integer') ex[f.key] = 0;
     else if (f.type === 'number') ex[f.key] = 0;
     else if (f.enumValues) ex[f.key] = f.enumValues.split(',')[0].trim();
     else ex[f.key] = `（${f.desc || f.label}）`;
   });
   return JSON.stringify([ex], null, 2);
+}
+
+function originalPdfPageRule(startPage, endPage) {
+  const mapping = [];
+  for (let page = startPage; page <= endPage; page++) {
+    mapping.push(`- 添付の${page - startPage + 1}ページ目 → 元PDFの${page}ページ目 → JSONのpage: ${page}`);
+  }
+  return `【pageの最優先ルール：元PDFの通しページ番号】
+pageは元PDFファイルの先頭ページを1として数えた物理的な順番です。紙面の「1面」「7面」、欄外の数字、印刷されたページ番号、PDFのページラベルは読み取ってもpageに使いません。表紙・広告・空白ページも元PDFの順番には含め、飛ばしたり詰め直したりしません。
+${mapping.join('\n')}
+各記事が実際に載っている添付ページの位置を確認し、上の対応表からpageを決めます。同じ添付ページの全記事は同じpageです。番号の計算は「元PDFの開始ページ ${startPage} + 添付内のページ順 - 1」。例えば紙面に「7面」と印字されていても、元PDFの4ページ目ならpageは4です。
+分割後に1から振り直さず、印字面番号との混用も禁止です。上の定義は参考資料や他の抽出ルールに異なる説明がある場合も優先します。出力前に全記事のpageが対応表の範囲 ${startPage}〜${endPage} に入り、実際の掲載位置と一致するか点検してください。`;
 }
 
 function buildExtractionPrompt(startPage, endPage, startNo) {
@@ -2844,6 +2857,8 @@ function buildExtractionPrompt(startPage, endPage, startNo) {
 【タスク】
 ${pageLabel}
 これらの画像からデータを抽出してください。
+
+${originalPdfPageRule(startPage, endPage)}
 
 【出力項目（スキーマ）】
 ${buildSchemaDescription(state.schema.fields)}
@@ -2935,7 +2950,11 @@ ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 // Manual Gemini workflow
 // =====================================================================
 function makeManualPrompt(kind, payload) {
-  const base = `【最重要：引用タグ禁止】
+  const base = `【使用モデル】
+このPDF抽出・解説にはGemini Flashを使用してください。Flash-Lite（Flash lightではなくFlash-Lite）を使用する指示ではありません。
+モデルは指示文だけでは切り替わりません。利用者は送信前にGemini側のモデル選択を確認してください。モデルを変更していないのに変更済みと報告しないでください。
+
+【最重要：引用タグ禁止】
 あなたの回答に「[cite: 数字]」「[cite_start]」「[cite_end]」「[24, 63]」などのいかなる参照タグ・引用番号も含めてはいけません。これは絶対遵守です。本文中であろうと文末であろうと、一切付けないでください。引用タグが付くと出力は不採用になります。
 
 【最重要：出力の完結性】
@@ -3000,7 +3019,7 @@ function makeManualPrompt(kind, payload) {
   if (kind === 'extract') {
     const role = $('rolePrompt').value.trim();
     const rules = ensureHighSchoolExplanationRule($('extractionRules').value);
-    const example = buildSchemaExample(allFields, payload.startNo);
+    const example = buildSchemaExample(allFields, payload.startNo, payload.startPage);
     const pageCount = payload.endPage - payload.startPage + 1;
     const enrichNote = includeEnrich
       ? `\n【一括抽出モード】\nA〜${String.fromCharCode(64 + allFields.length)}列の全${allFields.length}項目を1回の出力に含めてください。基本情報と深掘り分析を同時に生成します。\n`
@@ -3014,6 +3033,8 @@ ${role}
 - 添付PDFの1ページ目 = 元PDFの第${payload.startPage}ページ
 - 添付PDFの${pageCount}ページ目 = 元PDFの第${payload.endPage}ページ
 - pageフィールドには **元PDFのページ番号** (${payload.startPage}〜${payload.endPage}) を必ず記載すること
+
+${originalPdfPageRule(payload.startPage, payload.endPage)}
 
 【絶対に禁止事項（最重要）】
 1. Noを飛ばす行為 → ${payload.startNo}から1ずつ連続させること
@@ -3065,6 +3086,7 @@ ${newsChangeRule(state.schema.enrichFields)}${locationGuide}${articleBoxesGuide}
 
 注意:
 - 入力データの no を必ず保持
+- 入力データの page は元PDFファイルの先頭から数えた通しページ番号として必ず保持。紙面の印字番号・PDFページラベル・分割後の相対番号で置き換えない。
 - JSON配列を \`\`\`json のコードブロック1個だけで返す
 - 文字列内のダブルクォートは使わず、鉤括弧「」に置換する。文字列内改行は禁止
 - 【再掲・厳守】「[cite: 24, 63]」のような引用タグは一切出力しない`;
