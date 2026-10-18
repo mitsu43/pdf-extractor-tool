@@ -1105,8 +1105,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.18.1';
-const APP_VERSION_NAME = '記事の核心40〜80字・結論先行解説版';
+const APP_VERSION = 'v2026.10.18.2';
+const APP_VERSION_NAME = '核心の文字数不足でも記事を保持して取り込む修正版';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -3510,6 +3510,8 @@ function importBatchJson(batchId, text) {
     b.summary = wasTruncated
       ? `⚠ 途中で切断: ${arr.length}件を救出 (バッチ未完了)`
       : `✓ ${arr.length}件取り込み・厳格検査合格`;
+    const takeawayWarnings = reportArticleTakeawayWarnings(arr);
+    if(takeawayWarnings.length&&!wasTruncated)b.summary=`✓ ${arr.length}件取り込み／記事の核心${takeawayWarnings.length}件は要確認（原文保持）`;
     log(`✓ バッチ${batchId+1} (P${b.startPage}〜P${b.endPage}): ${b.articleCount}件取り込み${wasTruncated ? ' (切断)' : ''}`, wasTruncated ? 'warn' : 'ok');
 
     // Merge all completed batches into state.articles
@@ -3670,14 +3672,29 @@ function validateArticleTakeaway(value) {
   if(length<40||length>80||/[\r\n]/.test(text)||!/[。！？!?]$/.test(text)||/[。！？!?]/.test(text.slice(0,-1)))throw new Error('記事の核心は40〜80字の一文（句点で終える）にしてください。');
   return text;
 }
+function preserveArticleTakeaway(record) {
+  if(!('article_takeaway' in record))return record;
+  try {
+    validateArticleTakeaway(record.article_takeaway);
+    delete record.article_takeaway_warnings;
+  } catch(error) {
+    const count=typeof record.article_takeaway==='string'?Array.from(record.article_takeaway.trim()).length:null;
+    record.article_takeaway_warnings=[{code:'takeaway_format',characters:count,message:error.message}];
+  }
+  return record;
+}
+function reportArticleTakeawayWarnings(articles) {
+  const warnings=articles.filter(a=>a.article_takeaway_warnings?.length);
+  if(warnings.length)log(`記事本体は取り込みました。記事の核心${warnings.length}件は要確認：${warnings.map(a=>`No.${a.no}（${a.article_takeaway_warnings[0].characters??'文字列以外'}字）`).join('、')}。原文は保持しています。40〜80字・一文を満たすまでマップのタイトル下には表示されません。JSON全体の再出力は不要です。`,'warn');
+  return warnings;
+}
 function normalizeArticleRecord(record) {
   const out = deepStripCites(record || {});
   if ('no' in out) out.no = coerceInteger(out.no) ?? out.no;
   if ('page' in out) out.page = coerceInteger(out.page) ?? out.page;
   if ('map_json' in out) out.map_json = normalizeMapJson(out.map_json);
   if ('edition' in out && out.edition) out.edition = String(out.edition).toLowerCase().trim();
-  if ('article_takeaway' in out) out.article_takeaway = validateArticleTakeaway(out.article_takeaway);
-  return out;
+  return preserveArticleTakeaway(out);
 }
 
 function parseManualResponse(text) {
@@ -3837,9 +3854,11 @@ if ($('importManualResponse')) {
         throw new Error(`取り込み検証で不備が見つかりました:\n${issues.slice(0, 12).join('\n')}${issues.length > 12 ? `\n...ほか${issues.length - 12}件` : ''}`);
       }
       state.articles.push(...arr);
+      reportArticleTakeawayWarnings(arr);
       log(`✓ 抽出取り込み: ${arr.length}件 (累計${state.articles.length}件)${wasTruncated ? ' (一部のみ救出)' : ''}`, 'ok');
     } else {
       const arrClean = arr.map(normalizeArticleRecord);
+      reportArticleTakeawayWarnings(arrClean);
       const missingNo = arrClean.filter(e => !e.no).length;
       if (missingNo > 0) throw new Error(`深掘りJSONに no がない行が ${missingNo}件あります`);
       const map = new Map(arrClean.map(e => [e.no, e]));
@@ -4507,7 +4526,7 @@ function validateBatch(batch, startNo, startPage, endPage, opts = {}) {
       if (editionCode !== '?') a.edition = editionCode;
     }
     // ONLY fail on missing required fields (which actually need re-extraction)
-    fieldsToValidate.filter(f => f.required && f.key !== 'no' && f.key !== 'page').forEach(f => {
+    fieldsToValidate.filter(f => f.required && f.key !== 'no' && f.key !== 'page' && f.key !== 'article_takeaway').forEach(f => {
       if (a[f.key] === undefined || a[f.key] === null || a[f.key] === '') {
         issues.push(`${i+1}番目: ${f.label}が空`);
       }
@@ -5153,6 +5172,7 @@ function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
     men: page,
     title: String(a.headline || a.title || a['見出し'] || ''),
     article_takeaway: String(a.article_takeaway || ''),
+    ...(a.article_takeaway_warnings ? {article_takeaway_warnings:a.article_takeaway_warnings} : {}),
     place: loc.place,
     lat: loc.lat,
     lng: loc.lng,
@@ -5213,7 +5233,7 @@ function repairMapRecord(record, idx, fallbackDate = '', fallbackEdition = 'morn
   out.cat = String(out.cat || out.genre || out.category || out['ジャンル'] || '');
   out.men = String(out.men || out.page || out['PDFページ'] || '').replace(/(\d+)\.0+/g, '$1');
   out.title = String(out.title || out.headline || out['見出し'] || '');
-  out.article_takeaway = validateArticleTakeaway(out.article_takeaway);
+  preserveArticleTakeaway(out);
   out.place = String(out.place || loc.place || '日本');
   out.lat = Number.isFinite(parseFloat(out.lat)) ? parseFloat(out.lat) : loc.lat;
   out.lng = Number.isFinite(parseFloat(out.lng)) ? parseFloat(out.lng) : loc.lng;
