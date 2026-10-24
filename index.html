@@ -12,6 +12,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="jszip.min.js"></script>
+<link rel="stylesheet" href="./article-classification.css?v=20261024-3">
+<script src="./article-classification.js?v=20261024-3"></script>
 <style>
 :root {
   --paper: #f7f3ea;
@@ -881,12 +883,12 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
           📦 PDF分割とGemini入力をまとめて準備
         </div>
         <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 11px; color: #6b6359; line-height: 1.7; margin-bottom: 10px;" id="bulkPrepDesc">
-          「分割PDF一括」で全PDFを保存できます。Chrome拡張機能を入れると、バッチ数分のGeminiタブを開き、各タブへ対応する指示文を自動入力します。
+          「分割PDF一括」で全PDFを保存できます。各バッチの「Geminiを開く」で指示文をコピーし、Geminiへ貼り付けて対応するPDFを添付してください。抽出の手動連携にChrome拡張機能は不要です。
         </div>
         <div class="action-row" style="justify-content:flex-start; gap: 8px; flex-wrap: wrap; margin: 0;">
           <button class="btn btn-primary btn-sm" id="bulkPrepBtn">📦 全バッチを一括準備</button>
           <button class="btn btn-secondary btn-sm" id="downloadAllBatchPdfsBtn" disabled>📎 分割PDF一括</button>
-          <button class="btn btn-secondary btn-sm" id="extensionGeminiBtn" disabled>🧩 Geminiへ自動入力</button>
+          <button class="btn btn-secondary btn-sm" id="extensionGeminiBtn" hidden disabled>🧩 Geminiへ自動入力</button>
           <button class="btn btn-secondary btn-sm" id="openAllGeminiTabsBtn" disabled>🚀 Geminiタブ一括</button>
           <button class="btn btn-secondary btn-sm" id="copyAllBatchPromptsBtn" disabled>📋 全指示文コピー</button>
         </div>
@@ -1105,8 +1107,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.18.2';
-const APP_VERSION_NAME = '核心の文字数不足でも記事を保持して取り込む修正版';
+const APP_VERSION = 'v2026.10.24.2';
+const APP_VERSION_NAME = '19分類・記事の着眼点／Gemini手動連携';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -1509,6 +1511,7 @@ function applyPreset(presetId) {
     enrichLabel: p.enrichLabel || '',
     itemsPerPage: p.itemsPerPage || ITEMS_PER_PAGE_DEFAULT,
   };
+  ensureClassificationFields();
   $('rolePrompt').value = p.role;
   $('extractionRules').value = ensureHighSchoolExplanationRule(p.rules);
   $('presetDesc').textContent = p.description;
@@ -2402,6 +2405,7 @@ function setStatus(s) { $('progressStatus').innerHTML = s; }
 // Dynamic JSON schema builder for Gemini structured output
 // =====================================================================
 function buildExtractionJsonSchema() {
+  ensureClassificationFields();
   const properties = {};
   const required = [];
   state.schema.fields.forEach(f => {
@@ -2419,6 +2423,7 @@ function buildExtractionJsonSchema() {
 }
 
 function buildEnrichmentJsonSchema() {
+  ensureClassificationFields();
   if (!state.schema.enrichFields) return null;
   const properties = { no: { type: 'integer' } };
   const required = ['no'];
@@ -2430,6 +2435,7 @@ function buildEnrichmentJsonSchema() {
     properties[f.key] = prop;
     required.push(f.key);
   });
+  if(usesArticleClassification())for(const field of ArticleClassification.fields()){properties[field.key]={type:"string",description:field.desc,...(field.enumValues?{enum:ArticleClassification.currentValues}:{})};required.push(field.key);}
   return { type: "array", items: { type: "object", properties, required } };
 }
 
@@ -2806,6 +2812,31 @@ function trySalvagePartialJsonArray(text) {
 // =====================================================================
 // Dynamic prompt builders
 // =====================================================================
+function usesArticleClassification(){return state.preset==='nikkei'||(state.schema.fields.some(f=>f.key==='headline')&&state.schema.fields.some(f=>f.key==='genre'));}
+function ensureClassificationFields(){
+  if(!usesArticleClassification())return;
+  for(const field of ArticleClassification.fields()){
+    const found=state.schema.fields.find(f=>f.key===field.key);
+    if(found)Object.assign(found,field);else state.schema.fields.push(field);
+  }
+}
+function classificationPrompt(){ensureClassificationFields();return usesArticleClassification()?ArticleClassification.prompt():'';}
+function requireArticleClassifications(rows){
+  if(!usesArticleClassification())return;
+  const invalid=rows.filter(a=>!ArticleClassification.valid(a));
+  if(invalid.length)throw new Error(`分類・分類理由が未入力または不正な記事が${invalid.length}件あります。結果一覧の詳細で修正してください。`);
+}
+function updateArticleClassification(index,key,value){
+  const article=state.articles[index];article[key]=value;
+  for(const batch of state.manual?.batches||[])for(const item of batch.articles||[]){if((item.headline||item.title)===(article.headline||article.title)&&String(item.page)===String(article.page))item[key]=value;}
+  saveSession();
+}
+function classificationEditor(article,index){
+  if(!usesArticleClassification())return '';
+  const selected=ArticleClassification.get(article).code;
+  return `<div class="classification-editor"><label>分類<select data-classification-index="${index}" aria-label="記事${index+1}の分類"><option value="">未分類（選択してください）</option>${ArticleClassification.groups.map(g=>`<optgroup label="${g.id}. ${g.name}">${g.items.map(i=>`<option value="${escapeHtml(i.value)}" ${selected===i.code?'selected':''}>${escapeHtml(i.value)}</option>`).join('')}</optgroup>`).join('')}</select></label><label>着眼点（30〜90文字程度）<textarea data-classification-reason-index="${index}" maxlength="200" aria-label="記事${index+1}の分類理由">${escapeHtml(article['分類理由']||'')}</textarea></label></div>`;
+}
+
 function buildSchemaDescription(fields) {
   return fields.map((f, i) => {
     const enumStr = f.enumValues ? ` ※値は次のいずれか: ${f.enumValues}` : '';
@@ -2841,6 +2872,7 @@ ${mapping.join('\n')}
 }
 
 function buildExtractionPrompt(startPage, endPage, startNo) {
+  ensureClassificationFields();
   const role = $('rolePrompt').value.trim();
   const rules = ensureHighSchoolExplanationRule($('extractionRules').value);
   const pageList = [];
@@ -2857,6 +2889,8 @@ function buildExtractionPrompt(startPage, endPage, startNo) {
   );
 
   return `${role}
+
+${classificationPrompt()}
 
 【最重要：引用タグ禁止】
 あなたの回答に「[cite: 数字]」「[cite_start]」「[cite_end]」「[24, 63]」などのいかなる参照タグ・引用番号も含めてはいけません。これは絶対遵守です。本文中であろうと文末であろうと、一切付けないでください。もし付けてしまったら、付ける前に削除してから出力してください。これに違反すると出力は不採用になります。
@@ -2904,6 +2938,7 @@ function ensureArticleTakeawayField() {
   if(!fields.some(f=>f.key==='article_takeaway'))fields.push({key:'article_takeaway',label:'記事の核心',type:'string',long:false,desc:'原文の事実だけで40〜80字の一文。誰にどんな変化・結果が生じるかを示し句点で閉じる。AIの予測や独自解釈は禁止。根拠不足は空文字。'});
 }
 function buildEnrichmentPrompt(articleBatch, editionCode) {
+  ensureClassificationFields();
   ensureArticleTakeawayField();
   const role = $('rolePrompt').value.trim();
 
@@ -2918,6 +2953,8 @@ function buildEnrichmentPrompt(articleBatch, editionCode) {
 
   return `${role}
 
+${classificationPrompt()}
+
 【最重要：引用タグ禁止】
 あなたの回答に「[cite: 数字]」「[cite_start]」「[cite_end]」「[24, 63]」などのいかなる参照タグ・引用番号も含めてはいけません。これは絶対遵守です。本文中であろうと文末であろうと、一切付けないでください。
 
@@ -2930,7 +2967,7 @@ ${JSON.stringify(articleBatch, null, 2)}
 ${editionCode}
 
 【生成項目】
-${buildSchemaDescription(state.schema.enrichFields)}
+${buildSchemaDescription([...(state.schema.enrichFields||[]),...(usesArticleClassification()?ArticleClassification.fields():[])])}
 
 【トーン＆マナー】
 専門的で読者層に適した知的な表現。ただし読み上げ時間を抑えるため、各項目の長さはスキーマの指示に従うこと。
@@ -2963,8 +3000,11 @@ ${hasLocationField ? `【地図・住所フィールドの厳守事項】
 // Manual Gemini workflow
 // =====================================================================
 function makeManualPrompt(kind, payload) {
+  ensureClassificationFields();
   ensureArticleTakeawayField();
-  const base = `【使用モデル】
+  const base = `${classificationPrompt()}
+
+【使用モデル】
 このPDF抽出・解説にはGemini Flashを使用してください。Flash-Lite（Flash lightではなくFlash-Lite）を使用する指示ではありません。
 モデルは指示文だけでは切り替わりません。利用者は送信前にGemini側のモデル選択を確認してください。モデルを変更していないのに変更済みと報告しないでください。
 
@@ -3093,7 +3133,7 @@ ${payload.editionCode !== '?' ? `版種: ${payload.editionCode} (m=朝刊 / e=�
 ${JSON.stringify(payload.articles, null, 2)}
 
 【生成項目】
-${buildSchemaDescription(state.schema.enrichFields)}
+${buildSchemaDescription([...(state.schema.enrichFields||[]),...(usesArticleClassification()?ArticleClassification.fields():[])])}
 
 ${HIGH_SCHOOL_EXPLANATION_RULE}
 ${newsChangeRule(state.schema.enrichFields)}${locationGuide}${articleBoxesGuide}
@@ -3384,28 +3424,9 @@ async function openAllGeminiTabs() {
   }
 }
 
+// Compatibility with previously restored UI handlers: use the supported manual flow.
 function openGeminiTabsWithExtension() {
-  const m = state.manual;
-  if (!ensureManualPrepared() || !m?.batches?.length) return;
-  const requestId = `gemini-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const batches = m.batches.map(batch => ({
-    id: batch.id,
-    label: `バッチ${batch.id + 1} P${batch.startPage}-${batch.endPage}`,
-    prompt: buildBatchPrompt(batch.id),
-  }));
-  let acknowledged = false;
-  const onMessage = event => {
-    if (event.source !== window || event.data?.source !== 'pdf-extractor-extension' || event.data?.requestId !== requestId) return;
-    acknowledged = true;
-    window.removeEventListener('message', onMessage);
-    log(`🧩 Gemini ${event.data.opened || batches.length}タブへ指示文を割り当てました`, 'ok');
-  };
-  window.addEventListener('message', onMessage);
-  window.postMessage({ source: 'pdf-extractor-tool', type: 'OPEN_GEMINI_BATCHES', requestId, batches }, '*');
-  setTimeout(() => {
-    window.removeEventListener('message', onMessage);
-    if (!acknowledged) alert('Chrome拡張機能が見つかりません。配布ZIP内の chrome-extension フォルダをChromeへ読み込んでください。');
-  }, 1800);
+  return openAllGeminiTabs();
 }
 
 async function downloadAllBatchPdfs() {
@@ -4475,6 +4496,7 @@ function getEffectiveCallIntervalMs() {
 // when only 1 page is in the batch (unambiguous fix). Returns issues only for
 // genuinely fatal problems (missing required fields, empty result).
 function validateBatch(batch, startNo, startPage, endPage, opts = {}) {
+  ensureClassificationFields();
   const issues = [];
   if (!Array.isArray(batch) || batch.length === 0) {
     issues.push('データが0件');
@@ -4489,6 +4511,7 @@ function validateBatch(batch, startNo, startPage, endPage, opts = {}) {
 
   batch.forEach((a, i) => {
     batch[i] = a = normalizeArticleRecord(a);
+    if(usesArticleClassification()&&!ArticleClassification.valid(a))issues.push(`記事${i+1}：分類は正式な19の着眼点から選択し、分類理由を入力してください`);
     // Auto-fix page numbers
     if (pageField) {
       const p = a.page;
@@ -4617,6 +4640,7 @@ function runValidation() {
 // Schema-aware result rendering & export
 // =====================================================================
 function getAllFields() {
+  ensureClassificationFields();
   const base = state.schema.fields.slice();
   if (state.schema.enrichFields && state.schema.enrichFields.length > 0) {
     const enrichRequested = $('enrichFM')?.checked || state.schema.enrichEnabled;
@@ -4825,8 +4849,8 @@ function renderResults() {
   const enrichFields = allFields.length > baseFields.length ? allFields.slice(baseFields.length) : [];
 
   // Decide which fields to show in main row (limit to ~5 for readability)
-  const mainFields = baseFields.slice(0, 6);
-  const detailFields = baseFields.slice(6).concat(enrichFields);
+  const mainFields = baseFields.filter(f=>!['分類','分類理由'].includes(f.key)).slice(0,6);
+  const detailFields = baseFields.filter(f=>!mainFields.includes(f)).concat(enrichFields);
 
   $('resultsHead').innerHTML = `<tr>${mainFields.map(f => {
     let cls = '';
@@ -4860,14 +4884,17 @@ function renderResults() {
       <tr class="detail-row" id="detail-${rowKey}">
         <td colspan="${mainFields.length}">
           <dl class="detail-grid">
-            ${detailFields.map(f => `<dt>${escapeHtml(f.label)}</dt><dd>${escapeHtml(String(a[f.key] ?? ''))}</dd>`).join('')}
+            ${detailFields.filter(f=>!['分類','分類理由'].includes(f.key)).map(f => `<dt>${escapeHtml(f.label)}</dt><dd>${escapeHtml(String(a[f.key] ?? ''))}</dd>`).join('')}
           </dl>
+          ${classificationEditor(a,idx)}
           <div class="illustration-help">「解説イラスト」を押すと専用指示文をコピーしてGeminiを開きます。Geminiの入力欄に貼り付けて送信してください。</div>
         </td>
       </tr>` : '';
     return `<tr>${mainCellWithToggle}</tr>${detailRow}`;
   }).join('');
 
+  body.querySelectorAll('[data-classification-index]').forEach(input=>input.onchange=()=>{updateArticleClassification(Number(input.dataset.classificationIndex),'分類',input.value);});
+  body.querySelectorAll('[data-classification-reason-index]').forEach(input=>input.oninput=()=>{updateArticleClassification(Number(input.dataset.classificationReasonIndex),'分類理由',input.value);});
   body.querySelectorAll('.detail-toggle').forEach(el => {
     el.addEventListener('click', (e) => {
       const k = e.target.dataset.key;
@@ -4918,6 +4945,7 @@ function getMissingEnrichSummary() {
 }
 
 function blockExportIfEnrichMissing(formatLabel) {
+  try{requireArticleClassifications(state.articles);}catch(error){alert(error.message);return true;}
   const summary = getMissingEnrichSummary();
   if (!summary) return false;
   const lines = summary.missing.slice(0, 8).map(x => `・${x.label}: ${x.count}件欠落`).join('\n');
@@ -5171,6 +5199,8 @@ function articleToMapRecord(article, idx, dateKey, defaultEdition, idBase) {
     cat: String(a.genre || a.category || a['ジャンル'] || ''),
     men: page,
     title: String(a.headline || a.title || a['見出し'] || ''),
+    '分類':String(a['分類']||''),
+    '分類理由':String(a['分類理由']||''),
     article_takeaway: String(a.article_takeaway || ''),
     ...(a.article_takeaway_warnings ? {article_takeaway_warnings:a.article_takeaway_warnings} : {}),
     place: loc.place,
@@ -5302,6 +5332,7 @@ function planMapMerge(existing, incoming) {
 }
 
 function buildMapRecordsFromCurrent() {
+  requireArticleClassifications(state.articles);
   const dateKey = mapDateKey($('mapDateInput')?.value);
   if (!dateKey) throw new Error('日付を指定してください');
   const defaultEdition = $('mapEditionSelect')?.value || 'morning';
