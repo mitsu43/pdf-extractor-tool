@@ -9,7 +9,7 @@ const extract=(name,next)=>html.slice(html.indexOf('function '+name+'('),html.in
 const rows=[{no:1,page:1,headline:'保存した記事',分類:'B1 人材戦略の転換',分類理由:'採用する人材の戦略を見直す。'}];
 function setup(){
   const fields=new Map();
-  const $=id=>{if(!fields.has(id))fields.set(id,{value:id==='runMode'?'manual':'',classList:{remove(){},add(){}}});return fields.get(id);};
+  const $=id=>{if(!fields.has(id))fields.set(id,{value:id==='runMode'?'manual':'',classList:{remove(){},add(){}},scrollIntoView(){}});return fields.get(id);};
   const c={indexedDB:new IDBFactory(),state:{articles:structuredClone(rows),pdfFile:{name:'20261025m.pdf'},pdfPageCount:8,preset:'nikkei',schema:{fields:[{key:'headline',label:'見出し'}]},manual:{parallel:true,batchSize:5,maxPages:8,prepared:true,finalized:false,batches:[{id:0,startPage:1,endPage:5,status:'done',articles:structuredClone(rows),articleCount:1,pdfBytes:new Uint8Array([1,2]),prompt:'一時プロンプト'},{id:1,startPage:6,endPage:8,status:'pending'}]}},$,console:{error(){}},log(){},renderBatchGrid(){},renderResults(){},updateStartBtn(){}};
   vm.createContext(c);vm.runInContext(storage,c);return c;
 }

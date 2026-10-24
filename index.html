@@ -5886,6 +5886,8 @@ function showRestoreBanner(session) {
       updateStartBtn();
       log(`<strong>セッション復元</strong>: ${state.articles.length}件の記事を復元しました。PDFを再選択しても記事は保持します。`,'ok');
       banner.remove();
+      const restoredTarget=state.articles.length?$('resultsSection'):$('manualSection');
+      restoredTarget.scrollIntoView({behavior:'smooth',block:'start'});
     } catch(error) {
       find('restoreStatus').textContent='復元できませんでした。保存データは保持しています。'+(error.message||error);
       console.error('Restore failed (saved data preserved):',error);
