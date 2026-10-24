@@ -1107,8 +1107,8 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.24.4';
-const APP_VERSION_NAME = '19分類・記事の着眼点／Gemini手動連携';
+const APP_VERSION = 'v2026.10.25.1';
+const APP_VERSION_NAME = '保存データの再開・新規開始を修正';
 
 // =====================================================================
 // PRICING TABLE (USD per 1M tokens) — Verified May 2026 (ai.google.dev)
@@ -1332,6 +1332,7 @@ const state = {
   preset: null,       // Active preset ID
   lastApiCallAt: 0,   // Throttle: timestamp of last API call (ms)
   resume: null,       // { phase: 'extract'|'enrich', nextIndex: N } — when extraction failed midway
+  restoredSession: null, // Waiting for the original PDF to be selected again
   stopRequested: false, // Stop button pressed
   currentBatchPages: null, // Current batch's page range {startPage, endPage} for split-PDF download
 };
@@ -1369,6 +1370,59 @@ function openDB() {
   return dbPromise;
 }
 
+function manualSessionSnapshot(manual) {
+  if (!manual?.parallel || !Array.isArray(manual.batches)) return null;
+  return {
+    parallel: true, batchSize: manual.batchSize, maxPages: manual.maxPages,
+    testOnly: !!manual.testOnly, finalized: !!manual.finalized,
+    batches: manual.batches.map(batch => ({
+      id: batch.id, startPage: batch.startPage, endPage: batch.endPage,
+      status: ['done','error'].includes(batch.status) ? batch.status : 'pending',
+      articles: Array.isArray(batch.articles) ? batch.articles : [],
+      articleCount: batch.articleCount || 0, summary: batch.summary || '',
+    })),
+  };
+}
+
+function restoredManualSession(session) {
+  if (session.manual?.parallel && Array.isArray(session.manual.batches)) {
+    return { ...manualSessionSnapshot(session.manual), prepared: false };
+  }
+  // Older saves contain articles only: preserve them without claiming a batch is complete.
+  const maxPages = Number(session.pdfPageCount) || 0;
+  if (!maxPages || session.runMode === 'api') return null;
+  const batchSize = Math.min(5, Math.max(1, Number(session.manualBatchSize) || 5));
+  const batches = [];
+  for (let startPage=1; startPage<=maxPages; startPage+=batchSize) {
+    const endPage=Math.min(startPage+batchSize-1,maxPages);
+    const articles=(session.articles||[]).filter(article => {
+      const page=Number(article.page);
+      return page>=startPage&&page<=endPage || startPage===1&&(!Number.isFinite(page)||page<1||page>maxPages);
+    });
+    batches.push({id:batches.length,startPage,endPage,articles,articleCount:articles.length,
+      status:articles.length?'error':'pending',summary:articles.length?`保存済み${articles.length}件を保持（旧形式のため完了状態は未確認）`:''});
+  }
+  return {parallel:true,batchSize,maxPages,batches,prepared:false,finalized:false,testOnly:false};
+}
+
+function reconnectRestoredPdf() {
+  if (!state.restoredSession) return false;
+  state.restoredSession = null;
+  if (state.manual?.parallel) {
+    state.manual.prepared=true;
+    state.running=!state.manual.finalized;
+    $('batchSize').value=String(state.manual.batchSize);
+    $('manualSection').classList.remove('hidden');
+    renderBatchGrid();
+  }
+  renderResults();
+  $('resetBtn').classList.remove('hidden');
+  updateStartBtn();
+  saveSession();
+  log(`保存済み${state.articles.length}件を保持してPDFを再接続しました`, 'ok');
+  return true;
+}
+
 async function saveSession() {
   // Don't save during heavy ops — caller decides when to persist.
   // We save ONLY articles + minimal meta (no manualResponse, no PDF binary).
@@ -1381,6 +1435,10 @@ async function saveSession() {
       manualPhase: state.manual?.phase || null,
       manualIndex: state.manual?.index || 0,
       manualBatchSize: state.manual?.batchSize || null,
+      manual: manualSessionSnapshot(state.manual),
+      runMode: $('runMode').value,
+      resume: state.resume,
+      schema: state.schema,
       pdfName: state.pdfFile?.name || null,
       pdfPageCount: state.pdfPageCount || 0,
       preset: state.preset,
@@ -1389,8 +1447,9 @@ async function saveSession() {
     await new Promise((resolve, reject) => {
       const tx = db.transaction(DB_STORE, 'readwrite');
       const req = tx.objectStore(DB_STORE).put(payload);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || req.error);
+      tx.onabort = () => reject(tx.error || new Error('保存処理が中断されました'));
     });
   } catch (e) {
     // CRITICAL: On error, DO NOT delete existing data. Just log.
@@ -1418,18 +1477,15 @@ async function loadSession() {
 }
 
 async function clearSession() {
-  // ONLY called when user explicitly hits "破棄して新規開始"
-  try {
-    const db = await openDB();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(DB_STORE, 'readwrite');
-      const req = tx.objectStore(DB_STORE).delete(SESSION_ID);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-  } catch (e) {
-    console.error('Clear failed:', e);
-  }
+  // Explicit discard only. Errors must leave the banner available for retry.
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).delete(SESSION_ID);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('保存データの破棄に失敗しました'));
+    tx.onabort = () => reject(tx.error || new Error('保存データの破棄が中断されました'));
+  });
 }
 
 const todayStr = () => {
@@ -2277,14 +2333,16 @@ async function handleFile(file) {
     alert('日経新聞PDFのファイル名は、日本時間の日付8桁 + 版種で指定してください。\n例: 20260917m.pdf / 20260917e.pdf / 20260917r.pdf');
     return;
   }
+  if (state.restoredSession?.pdfName && file.name !== state.restoredSession.pdfName) {
+    alert('再開するには、保存時と同じPDF「'+state.restoredSession.pdfName+'」を選択してください。別のPDFで始める場合はリセットしてください。保存済み記事は保持しています。');
+    return;
+  }
   // Warn for very large PDFs (>30MB) — iPad Safari may struggle
   if (file.size > 30 * 1024 * 1024) {
     const sizeMB = (file.size / 1024 / 1024).toFixed(1);
     const proceed = confirm(`⚠ このPDFは ${sizeMB} MB と大きく、iPadのメモリを圧迫する可能性があります。\n\n対策:\n・小さいバッチサイズ（3〜5）で実行する\n・Macで「写真」アプリのPDFは画像が高解像度なので、可能なら別アプリで圧縮する\n\nこのまま続行しますか？`);
     if (!proceed) return;
   }
-  state.pdfFile = file;
-  state.pageImageCache = new Map();
   try {
     const ab = await file.arrayBuffer();
     // disableAutoFetch + disableStream: load only what we need, when we need it
@@ -2293,8 +2351,14 @@ async function handleFile(file) {
       disableAutoFetch: true,
       disableStream: true,
     }).promise;
+    if (state.restoredSession?.pdfPageCount && Number(state.restoredSession.pdfPageCount)!==pdf.numPages) {
+      if (typeof pdf.destroy==='function')await pdf.destroy();
+      throw new Error('保存時とPDFのページ数が異なります。同じPDFを選択してください。保存済み記事は保持しています。');
+    }
+    state.pdfFile = file;
     state.pdfDoc = pdf;
     state.pdfPageCount = pdf.numPages;
+    state.pageImageCache = new Map();
   } catch (err) {
     alert('PDFの解析に失敗: ' + err.message);
     return;
@@ -2303,6 +2367,7 @@ async function handleFile(file) {
   applyNikkeiFileMetadata(file.name);
   updateStartBtn();
   updateCostEstimate();
+  if (reconnectRestoredPdf()) return;
   if ($('runMode').value === 'manual' && state.preset === 'nikkei') {
     startManualWorkflow({ autoPrepare: true });
   }
@@ -2381,7 +2446,7 @@ $('batchSize').addEventListener('change', () => {
 });
 $('resetBtn').addEventListener('click', () => {
   if (confirm('現在の作業データを破棄してリセットしますか？\n保存された前回データも消去されます。')) {
-    clearSession().finally(() => location.reload());
+    clearSession().then(() => location.reload()).catch(error=>alert('リセットできませんでした。保存データは保持しています。'+error.message));
   }
 });
 
@@ -3190,6 +3255,7 @@ function startManualWorkflow(opts = {}) {
   } else {
     log(`<strong>並列手動相談モード開始</strong> · ${state.pdfFile.name} · ${state.pdfPageCount}ページ · ${batches.length}バッチ`, 'bold');
   }
+  saveSession();
   // Prompts and split-PDF download actions are ready immediately after upload.
   renderBatchGrid();
   $('manualStatus').textContent = autoPrepare ? `${batches.length}バッチ準備完了` : `${batches.length}バッチ準備待ち`;
@@ -5765,77 +5831,77 @@ function download(content, mime, ext) {
 
   // Restore session from IndexedDB (async)
   loadSession().then(session => {
-    if (session && session.articles && session.articles.length > 0) {
+    if (session && Array.isArray(session.articles) && (session.articles.length > 0 || session.manual?.batches?.length)) {
       showRestoreBanner(session);
     }
   });
 })();
 
 function showRestoreBanner(session) {
-  const elapsed = Date.now() - (session.savedAt || 0);
-  const elapsedStr = elapsed < 60_000 ? `${Math.round(elapsed/1000)}秒前`
-                  : elapsed < 3600_000 ? `${Math.round(elapsed/60_000)}分前`
-                  : elapsed < 86400_000 ? `${Math.round(elapsed/3600_000)}時間前`
-                  : `${Math.round(elapsed/86400_000)}日前`;
-  const banner = document.createElement('div');
+  document.getElementById('restoreBanner')?.remove();
+  const banner = document.createElement('section');
   banner.id = 'restoreBanner';
-  banner.style.cssText = `
-    position: sticky; top: 0; z-index: 100;
-    background: linear-gradient(135deg, #fdfaf1 0%, #fff 100%);
-    border: 2px solid #b8242a; border-left-width: 6px;
-    padding: 14px 18px; margin: -20px 0 24px 0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  `;
-  const pdfName = session.pdfName || '前回のファイル';
+  banner.setAttribute('aria-label','保存した作業の再開');
+  banner.style.cssText='position:sticky;top:0;z-index:100;background:#fdfaf1;border:2px solid #b8242a;border-left-width:6px;padding:14px 18px;margin:0 0 24px;box-shadow:0 4px 12px #0001;';
   banner.innerHTML = `
-    <div style="flex: 1; min-width: 240px;">
-      <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 14px; font-weight: 700; color: #14110d; margin-bottom: 4px;">
-        💾 前回の作業データが見つかりました
-      </div>
-      <div style="font-family: 'Noto Sans JP', sans-serif; font-size: 12px; color: #2a251e; line-height: 1.6;">
-        ${escapeHtml(pdfName)} · <strong>${session.articles.length}件</strong>抽出済み · ${elapsedStr}<br>
-        <span style="color: #6b6359; font-size: 11px;">※ PDFファイル本体は再選択が必要ですが、抽出データはそのまま使えます</span>
-      </div>
+    <strong>💾 前回の作業データが見つかりました</strong>
+    <p>${escapeHtml(session.pdfName||'前回のファイル')} · <strong>${session.articles.length}件</strong>保存済み<br>再開すると記事と進捗を復元します。PDF本体は同じファイルを選び直してください。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" class="btn btn-primary btn-sm" id="restoreYes">続きから再開</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="restoreNo">破棄して新規開始</button>
     </div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button class="btn btn-primary btn-sm" id="restoreYes">続きから再開</button>
-      <button class="btn btn-secondary btn-sm" id="restoreNo">破棄して新規開始</button>
+    <div id="restoreDiscardConfirm" class="hidden" style="margin-top:12px;">
+      <p>保存された作業データを破棄します。この操作は取り消せません。よろしいですか？</p>
+      <button type="button" class="btn btn-primary btn-sm" id="restoreDiscardCommit">破棄を確定して新規開始</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="restoreDiscardCancel">キャンセル</button>
     </div>
-  `;
-  document.querySelector('.container').insertBefore(banner, document.querySelector('header').nextSibling);
-
-  $('restoreYes').addEventListener('click', () => {
-    state.articles = session.articles || [];
-    if (session.pdfName) {
-      state.pdfFile = { name: session.pdfName };
-      state.pdfPageCount = session.pdfPageCount || 0;
-    }
-    if (session.manualPhase) {
-      state.manual = {
-        phase: session.manualPhase,
-        index: session.manualIndex || 0,
-        batchSize: session.manualBatchSize || 5,
-        enrich: true,
-        enrichBatchSize: 20,
-      };
-    }
-    renderResults();
-    $('resultsSection').classList.remove('hidden');
-    $('resetBtn').classList.remove('hidden');
-    banner.remove();
-    log(`<strong>セッション復元</strong>: ${state.articles.length}件のデータを復元しました`, 'bold');
-    if (!state.pdfDoc) {
-      log(`⚠ PDFファイル本体は再アップロードが必要です（続きの抽出には必要、エクスポートは可能）`, 'warn');
-    }
-  });
-
-  $('restoreNo').addEventListener('click', () => {
-    if (confirm('保存された作業データを破棄します。よろしいですか？\n（この操作は取り消せません）')) {
-      clearSession();
+    <p id="restoreStatus" role="status" aria-live="polite" style="margin:8px 0 0;"></p>`;
+  const container=document.querySelector('.container');
+  container.insertBefore(banner,container.querySelector('header').nextSibling);
+  const find=id=>banner.querySelector('#'+id);
+  find('restoreYes').onclick=()=>{
+    find('restoreStatus').textContent='保存した作業を復元しています…';
+    try {
+      if (session.preset && PRESETS[session.preset]) applyPreset(session.preset);
+      if (session.schema?.fields?.length) state.schema=structuredClone(session.schema);
+      else if (session.schemaFields?.length) state.schema.fields=structuredClone(session.schemaFields);
+      ensureClassificationFields();renderSchemaTable();
+      state.articles=structuredClone(session.articles||[]);
+      state.manual=restoredManualSession(session);
+      state.resume=session.resume||null;
+      state.restoredSession={pdfName:session.pdfName||'',pdfPageCount:Number(session.pdfPageCount)||0};
+      if (state.pdfDoc && session.pdfName && state.pdfFile?.name!==session.pdfName) state.pdfDoc=null;
+      if (!state.pdfDoc && session.pdfName) {
+        state.pdfFile={name:session.pdfName};state.pdfPageCount=session.pdfPageCount||0;
+      }
+      if(session.runMode && ['manual','api'].includes(session.runMode))$('runMode').value=session.runMode;
+      state.running=false;
+      renderResults();
+      $('resetBtn').classList.remove('hidden');
+      if (state.manual?.parallel) {
+        $('manualSection').classList.remove('hidden');renderBatchGrid();
+        if(!state.pdfDoc){$('bulkPrepBtn').disabled=true;$('openAllGeminiTabsBtn').disabled=true;}
+        $('manualStatus').textContent='進捗を復元しました。同じPDFを選び直すと続行できます。';
+      }
+      updateStartBtn();
+      log(`<strong>セッション復元</strong>: ${state.articles.length}件の記事を復元しました。PDFを再選択しても記事は保持します。`,'ok');
       banner.remove();
+    } catch(error) {
+      find('restoreStatus').textContent='復元できませんでした。保存データは保持しています。'+(error.message||error);
+      console.error('Restore failed (saved data preserved):',error);
     }
-  });
+  };
+  find('restoreNo').onclick=()=>{find('restoreDiscardConfirm').classList.remove('hidden');find('restoreStatus').textContent='確認後にのみ保存データを破棄します。';};
+  find('restoreDiscardCancel').onclick=()=>{find('restoreDiscardConfirm').classList.add('hidden');find('restoreStatus').textContent='破棄を取り消しました。保存データは保持しています。';};
+  find('restoreDiscardCommit').onclick=async()=>{
+    find('restoreYes').disabled=true;find('restoreNo').disabled=true;find('restoreDiscardCommit').disabled=true;
+    find('restoreStatus').textContent='保存データを破棄しています…';
+    try {await clearSession();location.reload();}
+    catch(error){
+      find('restoreStatus').textContent='破棄できませんでした。保存データは保持しています。'+(error.message||error);
+      find('restoreYes').disabled=false;find('restoreNo').disabled=false;find('restoreDiscardCommit').disabled=false;
+    }
+  };
 }
 </script>
 </body>

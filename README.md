@@ -1,3 +1,12 @@
+# 保存・再開の修正（v2026.10.25.1）
+
+- 「続きから再開」で保存済みの記事・スキーマ・手動バッチの進捗を復元する。
+- 元と同じ名前・ページ数のPDFを再選択しても記事を初期化せず、その進捗から続行する。
+- 旧形式の保存は記事を保持して復元し、保存されていないバッチ完了状態は推測しない。
+- 「破棄して新規開始」は画面内の確認を経て、IndexedDBの消去トランザクション完了後に新規画面へ戻る。失敗時は保存データと案内を残し、再試行できる。
+- 生成APIの呼び出し・R2公開・既存の画像保存には変更を加えない。
+- 検証: `node --test tests/test-session-restore.mjs tests/test-viewpoint-classification.mjs`。開発依存は `npm install --ignore-scripts --no-package-lock` で準備する。
+
 # 現行の公開版（2026-10-24）
 
 公開URLは https://mitsu43.github.io/pdf-extractor-tool/ 。GitHub Pagesはmain直下のindex.htmlを公開する。source/は以前の調査スナップショットで、現行公開元ではない。
