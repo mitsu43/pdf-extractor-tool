@@ -337,6 +337,16 @@ section { margin-bottom: 28px; }
 .schema-row input:focus, .schema-row select:focus {
   background: #fdfaf1;
 }
+/* Keep viewpoint instructions and editors consistent with the extraction rules. */
+#extractionRules,
+.schema-row.viewpoint-instruction,
+.schema-row.viewpoint-instruction input,
+.schema-row.viewpoint-instruction select,
+.classification-editor select,
+.classification-editor textarea {
+  background: #fff;
+  color: var(--ink);
+}
 .schema-row .drag-h {
   cursor: grab; color: var(--gray-soft); font-size: 14px;
   justify-content: center;
@@ -1107,7 +1117,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
 </div>
 
 <script>
-const APP_VERSION = 'v2026.10.24.2';
+const APP_VERSION = 'v2026.10.24.3';
 const APP_VERSION_NAME = '19分類・記事の着眼点／Gemini手動連携';
 
 // =====================================================================
@@ -1548,7 +1558,7 @@ function renderSchemaTable() {
   rows.innerHTML = '';
   state.schema.fields.forEach((f, idx) => {
     const row = document.createElement('div');
-    row.className = 'schema-row';
+    row.className = ['分類','分類理由'].includes(f.key) ? 'schema-row viewpoint-instruction' : 'schema-row';
     row.draggable = true;
     row.dataset.idx = idx;
     row.innerHTML = `
